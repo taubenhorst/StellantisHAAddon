@@ -1,0 +1,438 @@
+import os
+import json
+
+from homeassistant.const import ( UnitOfTemperature, UnitOfLength, PERCENTAGE, UnitOfEnergy, UnitOfSpeed, UnitOfVolume, EntityCategory )
+from homeassistant.components.sensor.const import ( SensorDeviceClass, SensorStateClass )
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+DOMAIN = "stellantis_vehicles"
+
+with open(os.path.dirname(os.path.abspath(__file__)) + "/manifest.json", "r") as f:
+    manifest = json.load(f)
+    # A pre-release manifest version carries a "-beta.N" suffix (e.g. "2026.8.1-beta.3").
+    INTEGRATION_IS_BETA = "-beta" in manifest["version"]
+    versions = manifest["version"].split("-beta")[0].split(".")
+    minor = int(versions[1])
+    if minor < 10:
+        minor = f"0{minor}"
+    patch = int(versions[2])
+    if patch < 10:
+        patch = f"0{patch}"
+    INTEGRATION_VERSION = int(f"{versions[0]}{minor}{patch}")
+
+with open(os.path.dirname(os.path.abspath(__file__)) + "/configs.json", "r") as f:
+    MOBILE_APPS = json.load(f)
+
+MQTT_REFRESH_TOKEN_TTL = (60*24*3) # 3 days
+OTP_FILENAME = "{#customer_id#}_otp.pickle"
+
+OAUTH_BASE_URL = "{#oauth_url#}/am/oauth2"
+OAUTH_AUTHORIZE_URL = OAUTH_BASE_URL + "/authorize"
+OAUTH_TOKEN_URL = OAUTH_BASE_URL + "/access_token"
+
+OAUTH_CODE_URL = "https://homeassistant-stellantis-vehicles-worker.onrender.com"
+
+API_BASE_URL = "https://api.groupe-psa.com"
+GET_USER_INFO_URL = API_BASE_URL + "/applications/cvs/v4/mauv/car-associations"
+GET_OTP_URL = API_BASE_URL + "/applications/cvs/v4/mobile/smsCode"
+GET_MQTT_TOKEN_URL = API_BASE_URL + "/connectedcar/v4/virtualkey/remoteaccess/token"
+CAR_API_BASE_URL = API_BASE_URL + "/connectedcar/v4/user"
+CAR_API_VEHICLES_URL = CAR_API_BASE_URL + "/vehicles"
+CAR_API_GET_VEHICLE_STATUS_URL = CAR_API_VEHICLES_URL + "/{#vehicle_id#}/status"
+CAR_API_GET_VEHICLE_TRIPS_URL = CAR_API_VEHICLES_URL + "/{#vehicle_id#}/trips"
+
+MQTT_SERVER = "mwa.mpsa.com"
+MQTT_PORT = 8885
+MQTT_KEEP_ALIVE_S = 120
+MQTT_RESP_TOPIC = "psa/RemoteServices/to/cid/"
+MQTT_EVENT_TOPIC = "psa/RemoteServices/events/MPHRTServices/"
+MQTT_REQ_TOPIC = "psa/RemoteServices/from/cid/"
+MQTT_QOS = 0
+
+KWH_CORRECTION = 1.343
+MS_TO_KMH_CONVERSION = 3.6
+
+ABRP_URL = "https://api.iternio.com/1/tlm/send"
+ABRP_API_KEY = "1e28ad14-df16-49f0-97da-364c9154b44a"
+
+CLIENT_ID_QUERY_PARAMS = {
+    "client_id": "{#client_id#}",
+    "locale": "{#locale#}"
+}
+
+OAUTH_AUTHORIZE_QUERY_PARAMS = {
+    "client_id": "{#client_id#}",
+    "response_type": "code",
+    "redirect_uri": "{#scheme#}://oauth2redirect/{#culture#}",
+    "scope": "openid%20profile%20email",
+    "locale": "{#locale#}"
+}
+
+OAUTH_TOKEN_HEADERS = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Authorization": "Basic {#basic_token#}",
+}
+
+GET_OTP_HEADERS = {
+    "Authorization": "Bearer {#oauth|access_token#}",
+    "User-Agent": "okhttp/4.8.0",
+    "Accept": "application/hal+json",
+    "x-introspect-realm": "{#realm#}"
+}
+
+OAUTH_GET_TOKEN_QUERY_PARAMS = {
+    "redirect_uri": "{#scheme#}://oauth2redirect/{#culture#}",
+    "grant_type": "authorization_code",
+    "code": "{#oauth_code#}"
+}
+
+OAUTH_REFRESH_TOKEN_QUERY_PARAMS = {
+    "grant_type": "refresh_token",
+    "refresh_token": "{#oauth|refresh_token#}"
+}
+
+CAR_API_HEADERS = {
+    "Authorization": "Bearer {#oauth|access_token#}",
+    "x-introspect-realm": "{#realm#}"
+}
+
+MQTT_REFRESH_TOKEN_JSON_DATA = {
+    "grant_type": "refresh_token",
+    "refresh_token": "{#mqtt|refresh_token#}"
+}
+
+FIELD_MOBILE_APP = "mobile_app"
+FIELD_COUNTRY_CODE = "country_code"
+FIELD_OAUTH_MANUAL_MODE = "oauth_manual_mode"
+FIELD_OAUTH_CODE = "oauth_code"
+FIELD_OAUTH_CODE_URL = "oauth_code_url"
+FIELD_REMOTE_COMMANDS = "remote_commands"
+FIELD_SMS_CODE = "sms_code"
+FIELD_PIN_CODE = "pin_code"
+FIELD_NOTIFICATIONS = "notifications"
+FIELD_ANONYMIZE_LOGS = "anonymize_logs"
+FIELD_RECONFIGURE = "reconfigure"
+
+PLATFORMS = [
+    "binary_sensor",
+    "button",
+    "device_tracker",
+    "number",
+    "switch",
+    "sensor",
+    "text",
+    "time"
+]
+
+UPDATE_INTERVAL = 60 # seconds
+
+# Consecutive empty vehicle-status responses before the account vehicle list is
+# re-fetched to check whether the vehicle was unpaired.
+EMPTY_STATUS_LIMIT = 3
+
+VEHICLE_TYPE_ELECTRIC = "Electric"
+VEHICLE_TYPE_HYBRID = "Hybrid"
+VEHICLE_TYPE_THERMIC = "Thermic"
+VEHICLE_TYPE_HYDROGEN = "Hydrogen"
+
+SENSORS_DEFAULT = {
+    "vehicle" : {
+        "icon" : "mdi:car",
+    },
+    "service_battery_voltage" : {
+        "icon" : "mdi:car-battery",
+        "unit_of_measurement" : PERCENTAGE,
+        "device_class": SensorDeviceClass.BATTERY,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["battery", "voltage"],
+        "updated_at_map" : ["battery", "createdAt"]
+    },
+    "temperature" : {
+        "icon" : "mdi:thermometer",
+        "unit_of_measurement" : UnitOfTemperature.CELSIUS,
+        "device_class": SensorDeviceClass.TEMPERATURE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["environment", "air", "temp"],
+        "updated_at_map" : ["environment", "air", "createdAt"]
+    },
+    "mileage" : {
+        "icon" : "mdi:road-variant",
+        "unit_of_measurement" : UnitOfLength.KILOMETERS,
+        "device_class": SensorDeviceClass.DISTANCE,
+        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "value_map" : ["odometer", "mileage"],
+        "updated_at_map" : ["odometer", "createdAt"]
+    },
+    "speed" : {
+        "icon" : "mdi:speedometer",
+        "unit_of_measurement" : UnitOfSpeed.KILOMETERS_PER_HOUR,
+        "device_class": SensorDeviceClass.SPEED,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["kinetic", "speed"],
+        "updated_at_map" : ["kinetic", "createdAt"]
+    },
+    "autonomy" : {
+        "icon" : "mdi:map-marker-distance",
+        "unit_of_measurement" : UnitOfLength.KILOMETERS,
+        "device_class": SensorDeviceClass.DISTANCE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Electric"}, "autonomy"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"]
+    },
+    "battery" : {
+        "unit_of_measurement" : PERCENTAGE,
+        "device_class": SensorDeviceClass.BATTERY,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Electric"}, "level"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+    },
+    "battery_health_resistance" : {
+        "icon" : "mdi:battery-heart-variant",
+        "unit_of_measurement" : PERCENTAGE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "battery", "health", "resistance"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+    },
+    "battery_health_capacity" : {
+        "icon" : "mdi:battery-heart-variant",
+        "unit_of_measurement" : PERCENTAGE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "battery", "health", "capacity"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+    },
+    "battery_charging_rate" : {
+        "icon" : "mdi:flash",
+        "unit_of_measurement" : UnitOfSpeed.KILOMETERS_PER_HOUR,
+        "device_class": SensorDeviceClass.SPEED,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "charging", "chargingRate"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+    },
+    "battery_charging_type" : {
+        "icon" : "mdi:lightning-bolt",
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "charging", "chargingMode"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+    },
+     "battery_charging_end" : {
+        "icon" : "mdi:battery-check",
+        "device_class" : SensorDeviceClass.TIMESTAMP,
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "charging", "remainingTime"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "available" : [{"battery_charging": "InProgress"}],
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+     },
+     "battery_capacity" : {
+        "icon" : "mdi:battery-arrow-up",
+        "unit_of_measurement" : UnitOfEnergy.KILO_WATT_HOUR,
+        "device_class" : SensorDeviceClass.ENERGY_STORAGE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "battery", "load", "capacity"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "suggested_display_precision": 2,
+        "engine": [VEHICLE_TYPE_ELECTRIC]
+     },
+     "battery_residual" : {
+        "icon" : "mdi:battery-arrow-up-outline",
+        "unit_of_measurement" : UnitOfEnergy.KILO_WATT_HOUR,
+        "device_class" : SensorDeviceClass.ENERGY_STORAGE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "battery", "load", "residual"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "suggested_display_precision": 2,
+        "engine": [VEHICLE_TYPE_ELECTRIC]
+     },
+    "fuel" : {
+        "icon": "mdi:gas-station",
+        "unit_of_measurement" : PERCENTAGE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Fuel"}, "level"],
+        "updated_at_map" : ["energy", {"type":"Fuel"}, "updatedAt"],
+        "engine": [VEHICLE_TYPE_THERMIC, VEHICLE_TYPE_HYBRID]
+    },
+    "fuel_autonomy" : {
+        "icon" : "mdi:map-marker-distance",
+        "unit_of_measurement" : UnitOfLength.KILOMETERS,
+        "device_class": SensorDeviceClass.DISTANCE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Fuel"}, "autonomy"],
+        "updated_at_map" : ["energy", {"type":"Fuel"}, "updatedAt"],
+        "engine": [VEHICLE_TYPE_THERMIC, VEHICLE_TYPE_HYBRID]
+    },
+    "fuel_consumption_total" : {
+        "icon": "mdi:gas-station-outline",
+        "unit_of_measurement" : UnitOfVolume.LITERS,
+        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "value_map" : ["energies", {"type":"Fuel"}, "extension", "fuel", "consumptions", "total"],
+        "updated_at_map" : ["energy", {"type":"Fuel"}, "updatedAt"],
+         "suggested_display_precision": 2,
+        "engine": [VEHICLE_TYPE_THERMIC, VEHICLE_TYPE_HYBRID]
+    },
+    "fuel_consumption_instant" : {
+        "icon": "mdi:gas-station-outline",
+        "unit_of_measurement" : UnitOfVolume.LITERS+"/100"+UnitOfLength.KILOMETERS,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["energies", {"type":"Fuel"}, "extension", "fuel", "consumptions", "instant"],
+        "updated_at_map" : ["energy", {"type":"Fuel"}, "updatedAt"],
+        "engine": [VEHICLE_TYPE_THERMIC, VEHICLE_TYPE_HYBRID]
+    },
+    "coolant_temperature" : {
+        "icon": "mdi:coolant-temperature",
+        "unit_of_measurement" : UnitOfTemperature.CELSIUS,
+        "device_class": SensorDeviceClass.TEMPERATURE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["engines", 0, "extension", "thermic", "coolant", "temp"],
+        "updated_at_map" : ["engines", 0, "createdAt"],
+        "engine": [VEHICLE_TYPE_THERMIC, VEHICLE_TYPE_HYBRID]
+    },
+    "oil_temperature" : {
+        "icon": "mdi:oil-temperature",
+        "unit_of_measurement" : UnitOfTemperature.CELSIUS,
+        "device_class": SensorDeviceClass.TEMPERATURE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["engines", 0, "extension", "thermic", "oil", "temp"],
+        "updated_at_map" : ["engines", 0, "createdAt"],
+        "engine": [VEHICLE_TYPE_THERMIC, VEHICLE_TYPE_HYBRID]
+    },
+    "air_temperature" : {
+        "icon": "mdi:thermometer-lines",
+        "unit_of_measurement" : UnitOfTemperature.CELSIUS,
+        "device_class": SensorDeviceClass.TEMPERATURE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["engines", 0, "extension", "thermic", "air", "temp"],
+        "updated_at_map" : ["engines", 0, "createdAt"],
+        "engine": [VEHICLE_TYPE_THERMIC, VEHICLE_TYPE_HYBRID]
+    },
+    "driving_behavior" : {
+        "icon": "mdi:steering",
+        "value_map" : ["drivingBehavior", "mode"],
+        "updated_at_map" : ["drivingBehavior", "createdAt"]
+    }
+}
+
+BINARY_SENSORS_DEFAULT = {
+    "moving" : {
+        "icon" : "mdi:car-traction-control",
+        "value_map" : ["kinetic", "moving"],
+        "updated_at_map" : ["kinetic", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.MOVING,
+        "on_value": True
+    },
+    "doors" : {
+        "icon" : "mdi:car-door-lock",
+        "value_map" : ["doorsState", "lockedStates"],
+        "updated_at_map" : ["doorsState", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.LOCK,
+        "on_value": "Unlocked"
+    },
+    "door_trunk" : {
+        "icon" : "mdi:car-back",
+        "value_map" : ["doorsState", "opening", {"identifier":"Trunk"}, "state"],
+        "updated_at_map" : ["doorsState", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.DOOR,
+        "on_value": "Open"
+    },
+    "door_driver" : {
+        "icon" : "mdi:car-door",
+        "value_map" : ["doorsState", "opening", {"identifier":"Driver"}, "state"],
+        "updated_at_map" : ["doorsState", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.DOOR,
+        "on_value": "Open"
+    },
+    "door_passenger" : {
+        "icon" : "mdi:car-door",
+        "value_map" : ["doorsState", "opening", {"identifier":"Passenger"}, "state"],
+        "updated_at_map" : ["doorsState", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.DOOR,
+        "on_value": "Open"
+    },
+    "door_rear_left" : {
+        "icon" : "mdi:car-door",
+        "value_map" : ["doorsState", "opening", {"identifier":"RearLeft"}, "state"],
+        "updated_at_map" : ["doorsState", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.DOOR,
+        "on_value": "Open"
+    },
+    "door_rear_right" : {
+        "icon" : "mdi:car-door",
+        "value_map" : ["doorsState", "opening", {"identifier":"RearRight"}, "state"],
+        "updated_at_map" : ["doorsState", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.DOOR,
+        "on_value": "Open"
+    },
+    "belt_driver" : {
+        "icon" : "mdi:seatbelt",
+        "value_map" : ["safety", "beltStatus", {"id":"Driver"}, "belt"],
+        "updated_at_map" : ["safety", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.SAFETY,
+        "on_value": "Omission"
+    },
+    "belt_passenger" : {
+        "icon" : "mdi:seatbelt",
+        "value_map" : ["safety", "beltStatus", {"id":"Passenger"}, "belt"],
+        "updated_at_map" : ["safety", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.SAFETY,
+        "on_value": "Omission"
+    },
+    "battery_plugged" : {
+        "icon" : "mdi:power-plug-battery",
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "charging", "plugged"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "device_class" : BinarySensorDeviceClass.PLUG,
+        "on_value": True,
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+    },
+    "battery_charging" : {
+        "icon" : "mdi:battery-charging-medium",
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "charging", "status"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "device_class" : BinarySensorDeviceClass.BATTERY_CHARGING,
+        "on_value": "InProgress",
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+    },
+    "engine" : {
+        "icon" : "mdi:power",
+        "value_map" : ["ignition", "type"],
+        "updated_at_map" : ["ignition", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.POWER,
+        "on_value": "StartUp"
+    },
+    "preconditioning" : {
+        "icon" : "mdi:air-conditioner",
+        "value_map" : ["preconditioning", "airConditioning", "status"],
+        "updated_at_map" : ["preconditioning", "airConditioning", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.POWER,
+        "on_value": "Enabled"
+    },
+    "alarm" : {
+        "icon" : "mdi:alarm-light",
+        "value_map" : ["alarm", "status", "activation"],
+        "updated_at_map" : ["alarm", "status", "createdAt"],
+        "device_class" : BinarySensorDeviceClass.RUNNING,
+        "on_value": "Active"
+    },
+    "privacy" : {
+        "icon" : "mdi:eye-off",
+        "value_map" : ["privacy", "state"],
+        "updated_at_map" : ["privacy", "createdAt"],
+        "entity_category" : EntityCategory.DIAGNOSTIC,
+        "on_value": "Full"
+    },
+    "daylight" : {
+        "icon" : "mdi:weather-sunny",
+        "device_class": BinarySensorDeviceClass.LIGHT,
+        "value_map" : ["environment", "luminosity", "day"],
+        "updated_at_map" : ["environment", "luminosity", "createdAt"],
+        "on_value": True
+    }
+}
+
+TRANSLATION_PLACEHOLDERS = {
+    "oauth_remote_link": "https://github.com/andreadegiovine/homeassistant-stellantis-vehicles-worker-v2",
+    "oauth_token_doc_link": "https://github.com/andreadegiovine/homeassistant-stellantis-vehicles?tab=readme-ov-file#oauth2-code",
+    "otp_nokmaxnbtools_doc_link": "https://github.com/andreadegiovine/homeassistant-stellantis-vehicles?tab=readme-ov-file#otp-error---nokmaxnbtools"
+}

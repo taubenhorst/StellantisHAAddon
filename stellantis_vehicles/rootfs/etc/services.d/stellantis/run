@@ -1,0 +1,18 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start the Stellantis Vehicles service.
+# Fills in MQTT settings from the Supervisor if the user left them empty.
+# ==============================================================================
+set -e
+
+if bashio::config.is_empty 'mqtt.host' && bashio::services.available 'mqtt'; then
+    bashio::log.info "Using MQTT broker provided by the Supervisor"
+    export STELLANTIS_MQTT_HOST="$(bashio::services mqtt 'host')"
+    export STELLANTIS_MQTT_PORT="$(bashio::services mqtt 'port')"
+    export STELLANTIS_MQTT_USER="$(bashio::services mqtt 'username')"
+    export STELLANTIS_MQTT_PASSWORD="$(bashio::services mqtt 'password')"
+fi
+
+export DATA_DIR=/data
+bashio::log.info "Starting Stellantis Vehicles"
+exec python3 /app/main.py

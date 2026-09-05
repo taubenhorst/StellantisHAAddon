@@ -1,0 +1,44 @@
+name: Build add-on images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [aarch64, amd64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read add-on version
+        id: version
+        run: echo "version=$(grep '^version:' stellantis_vehicles/config.yaml | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build add-on image
+        uses: home-assistant/builder@master
+        with:
+          args: |
+            ${{ github.event_name == 'pull_request' && '--test' || '' }} \
+            --${{ matrix.arch }} \
+            --target stellantis_vehicles \
+            --image stellantis-vehicles-${{ matrix.arch }} \
+            --docker-hub ghcr.io/${{ github.repository_owner }} \
+            --addon
