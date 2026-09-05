@@ -21,8 +21,11 @@ from homeassistant.core import HomeAssistant  # noqa: E402  (shim)
 from stellantis_vehicles.stellantis import StellantisVehicles  # noqa: E402
 from bridge.mqtt_bridge import MqttBridge  # noqa: E402
 from web import server as web_server  # noqa: E402
+from web.setup import SetupFlow  # noqa: E402
 
-DATA_DIR = os.environ.get("DATA_DIR", "/data")
+# /data inside the add-on container; ../data next to app/ on a dev box
+DATA_DIR = os.environ.get("DATA_DIR") or (
+    "/data" if os.path.isdir("/data") else os.path.normpath(os.path.join(APP_DIR, "..", "data")))
 OPTIONS_FILE = os.path.join(DATA_DIR, "options.json")
 _LOGGER = logging.getLogger("stellantis_addon")
 
@@ -45,15 +48,23 @@ async def run() -> None:
 
     loop = asyncio.get_running_loop()
     hass = HomeAssistant(config_dir=DATA_DIR, language=options.get("language", "en"), loop=loop)
-    state = {"vehicles": 0, "mqtt": "not connected", "auth": "not configured"}
-
-    web_runner = await web_server.start(state, int(options.get("ingress_port", 8099)))
+    state = {"vehicles": [], "mqtt": "not connected"}
 
     stellantis = StellantisVehicles(hass)
-    # Upstream expects a config entry to be attached before any stored-config access.
+    # Same order as upstream async_setup_entry: runtime config from the stored
+    # entry data, then attach the entry (stored-config access needs it).
+    stellantis.save_config(hass.config_entries.entry.data)
     stellantis.set_entry(hass.config_entries.entry)
-    # TODO: restore stored config from hass.config_entries.entry.data,
-    #       run OAuth/OTP setup via web UI if missing, then:
+
+    async def on_configured() -> None:
+        # TODO (step 3): start vehicles here, see below
+        _LOGGER.info("Setup complete, stored config ready")
+
+    flow = SetupFlow(hass, stellantis, options, on_configured)
+    web_runner = await web_server.start(state, flow, hass, int(options.get("ingress_port", 8099)))
+    _LOGGER.info("Setup step: %s", flow.step)
+
+    # TODO (step 3): when flow.step == "done" (now or via on_configured):
     #   vehicles = await stellantis.get_user_vehicles()
     #   for vehicle in vehicles:
     #       coordinator = await stellantis.async_get_coordinator(vehicle)
@@ -72,7 +83,10 @@ async def run() -> None:
 
     stop = asyncio.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, stop.set)
+        try:
+            loop.add_signal_handler(sig, stop.set)
+        except NotImplementedError:  # Windows dev box: Ctrl+C raises KeyboardInterrupt instead
+            pass
     await stop.wait()
 
     _LOGGER.info("Shutting down")

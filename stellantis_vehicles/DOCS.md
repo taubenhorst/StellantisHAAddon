@@ -4,10 +4,16 @@
 
 1. Mosquitto-Broker-Add-on installieren und die MQTT-Integration in Home Assistant einrichten.
 2. Add-on-Optionen ausfüllen: App (`mobile_app`), Ländercode, E-Mail und Passwort des Stellantis-Kontos.
-3. Add-on starten und die Ingress-Seite öffnen. Der Login läuft im Add-on über ein
-   headless Chromium (`oauth_mode: browser`). Alternativ `manual`: Login im eigenen
-   Browser, die `mym…://…code=`-URL wird in der Ingress-Seite eingetragen.
-4. Für Fernbefehle (Laden starten, Klima, Türen) folgt die OTP-Einrichtung per SMS-Code und PIN.
+3. Add-on starten und die Ingress-Seite (Seitenleiste „Stellantis") öffnen. Der Login läuft im
+   Add-on über ein headless Chromium (`oauth_mode: browser`); E-Mail/Passwort aus den Optionen
+   sind vorausgefüllt. Alternativ `manual`: Anmeldeseite über den Link öffnen, im Netzwerk-Tab
+   der Browser-DevTools die fehlgeschlagene `mym…://oauth2redirect/…?code=…`-Anfrage suchen und
+   die URL (oder nur den Code) auf der Ingress-Seite einfügen.
+4. Bei `remote_commands: true` folgt direkt die OTP-Einrichtung: Stellantis schickt einen SMS-Code,
+   dazu kommt der PIN-Code aus der Fahrzeug-App. „SMS erneut anfordern" und „Ohne Fernbefehle
+   fortfahren" stehen als Ausweg bereit.
+5. Die Statusseite zeigt Konto, Token-Laufzeiten, Fahrzeuge und Benachrichtigungen; dort lassen
+   sich Fernbefehle neu einrichten oder abschalten und eine Neu-Anmeldung starten.
 
 Die Fahrzeuge erscheinen anschließend als Geräte der MQTT-Integration (ein Gerät pro VIN).
 Benötigt Home Assistant ≥ 2025.10 (MQTT-Discovery mit `default_entity_id`).
@@ -22,6 +28,7 @@ Benötigt Home Assistant ≥ 2025.10 (MQTT-Discovery mit `default_entity_id`).
 | `oauth_mode` | `browser` (automatisch) oder `manual` |
 | `remote_commands` | Fernbefehle aktivieren (OTP nötig) |
 | `mqtt.*` | Leer lassen, dann wird der Supervisor-Broker verwendet |
+| `language` | Sprache der Entity-Namen und der Ingress-Seite |
 
 ## Entities
 

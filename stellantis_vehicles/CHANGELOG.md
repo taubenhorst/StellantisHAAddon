@@ -11,7 +11,10 @@ Skelett — noch nicht lauffähig als Add-on.
   number, switch, text, device_tracker) als HA-Gerät pro Fahrzeug; Command-Topics für Buttons,
   Zahlen, Schalter, Texte und die Ladestartzeit
 - Clean-Room-Playwright-Login in `oauth_browser/`
-- Offline-Smoke-Test `tests/smoke_bridge.py`
-- Stub: Ingress-UI
+- Ingress-UI (`web/`): Login (Chromium im Add-on oder manuell per Code/URL), OTP-Einrichtung
+  per SMS-Code + PIN, Statusseite mit Token-Laufzeiten, Fahrzeugen, Benachrichtigungen;
+  Fernbefehle deaktivieren/neu einrichten, Neu-Anmeldung
+- Offline-Smoke-Tests `tests/smoke_bridge.py`, `tests/smoke_web.py`
+- `mobile_app` auf die vom Upstream unterstützten Apps beschränkt
 
-Offen: Login-/OTP-Flow in der Ingress-UI, Wiring in `main.py`, CI-Build testen.
+Offen: Wiring in `main.py` (Fahrzeuge starten), CI-Build testen.

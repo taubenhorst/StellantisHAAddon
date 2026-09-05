@@ -33,17 +33,35 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
 - Offline-Test: `cd stellantis_vehicles && ../.venv/Scripts/python tests/smoke_bridge.py`
   (Fake-Client + Recorder statt paho, 52 Checks). Vor jeder Änderung an Bridge/Coordinator laufen lassen.
 
+## Ingress-UI (Schritt 2, fertig)
+- `app/web/setup.py`: `SetupFlow` = Ersatz für die Upstream-`config_flow.py`, ohne HTML. Schritte
+  `login` → `otp` → `done`, abgeleitet aus der Stored Config (`_derive_step`). Lange Aktionen
+  (Chromium-Login, Token-Requests) laufen als Task, die Seite pollt (`meta refresh`, solange `busy`).
+  Speichert exakt die Upstream-Entry-Felder (`oauth`, `mqtt`, `customer_id`, `remote_commands`,
+  `notifications`, `anonymize_logs`, `mobile_app`, `country_code`) über `_store()` = `save_config` +
+  `update_stored_config`. Fehlertexte aus `translations/<lang>.json` (`config.error.*`).
+- `app/web/server.py`: eine Seite `/`, rendert je nach Schritt; POST-Endpunkte `login`, `otp`, `sms`,
+  `remote/disable`, `remote/reconfigure`, `reauth`, `notifications/dismiss`; `GET /api/state`, `/health`.
+  Nur relative URLs (Ingress-Proxy). `state["vehicles"]` erwartet Dicts `{vin, type, ok, updated_at}`.
+- Stolpersteine: `hass_notify()` schweigt ohne `notifications: true` in der Stored Config → Flow persistiert
+  die Defaults im Konstruktor; `get_otp_code()` macht `os.mkdir` auf `<config>/.storage/<domain>` →
+  `.storage` wird vor dem OTP-Schritt angelegt; `reconfigure` setzt `remote_commands=False`, daher `_force_otp`.
+- Offline-Test: `tests/smoke_web.py` (aiohttp-TestClient, Fake-Client, 44 Checks).
+
 ## Stand
-Schritt 1 (Discovery-Mapping) umgesetzt und offline getestet. Docker-Build und CI ungetestet.
-Bekannte Lücke: `entity_picture` des Fahrzeugs wird nicht gesetzt (HA verlangt absolute URL).
+Schritte 1 (Discovery-Mapping) und 2 (Ingress-UI mit Login/OTP) umgesetzt und offline getestet.
+`main.py` startet Flow und UI, startet aber noch keine Fahrzeuge. Docker-Build und CI ungetestet.
+Bekannte Lücken: `entity_picture` des Fahrzeugs (HA verlangt absolute URL); der Chromium-Login
+(`oauth_browser`) ist nur gegen die echte Stellantis-Seite testbar.
 
 ## Nächste Schritte
-2. `app/web/server.py`: Login-Flow (browser/manual), SMS-Code + PIN für OTP,
-   Statusseite mit `hass.notifications`.
-3. `app/main.py`: Wiring — Stored Config aus `hass.config_entries.entry.data` in `stellantis.save_config`,
-   `get_user_vehicles` → `async_get_coordinator` → `bridge.attach` → `coordinator.start()`,
-   `scheduled_tokens_refresh`, `connect_mqtt`; `coordinator.on_auth_failed` an die UI hängen;
-   MQTT-Zugang aus `STELLANTIS_MQTT_*` (setzt `rootfs/.../run`) lesen, nicht nur aus `options.mqtt`.
+3. `app/main.py`: Wiring — in `on_configured` bzw. beim Start mit `flow.step == "done"`:
+   `scheduled_tokens_refresh` → `get_user_vehicles` → `prune_stored_vehicle_configs` →
+   `async_get_coordinator` → `bridge.attach` → `stagger_first_poll` → `coordinator.start()`;
+   `coordinator.on_auth_failed` → `flow.reauth()` + Notification; `state["vehicles"]` befüllen;
+   MQTT-Zugang aus `STELLANTIS_MQTT_*` (setzt `rootfs/.../run`) lesen, nicht nur aus `options.mqtt`;
+   `bridge.on_connection_change` → `state["mqtt"]`. Ein Neu-Login (reauth) muss laufende Coordinators
+   weiterverwenden (Tokens liegen in `stellantis._config`).
 4. Docker-Build lokal, dann CI.
 
 ## Lokal starten
