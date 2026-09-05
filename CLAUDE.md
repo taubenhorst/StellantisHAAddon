@@ -66,14 +66,27 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
   10 s begrenzt, `pw.stop()` räumt auf. Im Linux-Container nicht beobachtet.
 - Diagnose ohne Add-on: `python app/oauth_browser/login.py --email …` (fragt Passwort ab, listet URLs).
 
+## Docker (Schritt 4, lokal verifiziert 05.09.2026)
+- Lokaler Build (Docker Desktop, amd64): `docker build --build-arg BUILD_VERSION=0.1.0 -t stellantis-vehicles:dev stellantis_vehicles`
+  (`BUILD_FROM` hat einen amd64-Default; der HA-Builder überschreibt ihn). Build ~2 min, Image **1,92 GB**
+  (volles Chromium + Headless-Shell + X11/GTK-Libs; die 600 MB aus der Planung waren zu optimistisch).
+- Im Container: `channel="chromium"` startet (151.0.7922.34), s6-Start liefert nach ~7 s `/health`.
+  Ohne Supervisor meckert bashio im `run`-Skript („Could not resolve host: supervisor") — harmlos.
+- Test-Setup: temporäres `/data` mit `options.json` mounten, `docker run -d -p 8099:8099 -v <dir>:/data …`;
+  Chromium-Check per `docker run --rm --entrypoint python3 … /data/chromium_check.py`.
+- `.dockerignore` hält `data/` (Tokens, OTP-Pickle) und `tests/` aus dem Build-Kontext.
+
 ## Stand
-Schritte 1–3 umgesetzt und offline getestet; echter Login per Chromium verifiziert (Code erhalten).
-Docker-Build und CI ungetestet. Bekannte Lücke: `entity_picture` des Fahrzeugs (HA verlangt absolute URL).
+Schritte 1–4 umgesetzt: offline getestet, echter Login + Statusabruf des e-Rifters verifiziert,
+Image lokal gebaut und gestartet. Offen: CI-Build/GHCR und Installation auf dem Pi.
 
 ## Nächste Schritte
-4. Docker-Build lokal, dann CI (`playwright install --with-deps chromium` muss auch das volle Chromium
-   liefern, nicht nur die Headless-Shell — `channel="chromium"` im Container prüfen).
-5. Erster Lauf gegen echte Fahrzeugdaten: Status-JSON mit den `value_map`s abgleichen.
+5. GitHub-Repo `taubenhorst/StellantisHAAddon` anlegen, pushen, Workflow-Lauf prüfen; GHCR-Pakete auf
+   „public" stellen, sonst kann der Supervisor nicht pullen. aarch64-Build nur in der CI möglich.
+6. Auf dem Pi installieren; dort die HACS-Integration `stellantis_vehicles` deaktivieren (doppeltes Polling,
+   OTP-Gerätelimit). Erster Lauf mit Supervisor-MQTT prüfen (`services: mqtt:want`).
+7. Optional Image verkleinern (`playwright install chromium --no-shell` spart ~150 MB, dann greift der
+   Fallback in `_launch` nicht mehr).
 
 ## Lokal starten
     cd stellantis_vehicles && pip install -r requirements.txt

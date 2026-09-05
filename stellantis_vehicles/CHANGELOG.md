@@ -20,4 +20,7 @@ Skelett — noch nicht lauffähig als Add-on.
 - Offline-Smoke-Tests `tests/smoke_bridge.py`, `tests/smoke_web.py`, `tests/smoke_runtime.py`
 - `mobile_app` auf die vom Upstream unterstützten Apps beschränkt
 
-Offen: CI-Build testen, erster Lauf gegen echte Fahrzeugdaten.
+- Echter Login und Statusabruf verifiziert; Fahrzeugbild als `entity_picture`
+- Docker-Image lokal gebaut und gestartet (amd64, 1,9 GB); `.dockerignore`
+
+Offen: CI-Build/GHCR, Installation auf dem Pi.
