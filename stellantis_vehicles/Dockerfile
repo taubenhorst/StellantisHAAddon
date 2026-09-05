@@ -1,6 +1,10 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
+# home-assistant/builder passes the config.yaml version as BUILD_VERSION
+ARG BUILD_VERSION=dev
+ENV ADDON_VERSION=${BUILD_VERSION}
+
 ENV LANG=C.UTF-8 \
     PIP_BREAK_SYSTEM_PACKAGES=1 \
     PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright

@@ -113,8 +113,13 @@ class StellantisVehicleCoordinator:
             self._listeners.remove(listener)
 
     def start(self) -> None:
-        if self._task is None:
+        """Start polling; also restarts a loop that ended after an auth failure."""
+        if self._task is None or self._task.done():
             self._task = self._hass.loop.create_task(self._run(), name=f"{DOMAIN}:{self.vin}")
+
+    @property
+    def running(self) -> bool:
+        return self._task is not None and not self._task.done()
 
     async def stop(self) -> None:
         if self._task:

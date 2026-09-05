@@ -14,7 +14,10 @@ Skelett — noch nicht lauffähig als Add-on.
 - Ingress-UI (`web/`): Login (Chromium im Add-on oder manuell per Code/URL), OTP-Einrichtung
   per SMS-Code + PIN, Statusseite mit Token-Laufzeiten, Fahrzeugen, Benachrichtigungen;
   Fernbefehle deaktivieren/neu einrichten, Neu-Anmeldung
-- Offline-Smoke-Tests `tests/smoke_bridge.py`, `tests/smoke_web.py`
+- Runtime (`runtime.py`): Fahrzeuge laden, Coordinators starten, Bridge anbinden, Retry bei
+  API-Fehlern, Neu-Login bei abgelaufener Anmeldung ohne Neustart
+- MQTT-Broker aus den Optionen oder vom Supervisor (`services: mqtt`)
+- Offline-Smoke-Tests `tests/smoke_bridge.py`, `tests/smoke_web.py`, `tests/smoke_runtime.py`
 - `mobile_app` auf die vom Upstream unterstützten Apps beschränkt
 
-Offen: Wiring in `main.py` (Fahrzeuge starten), CI-Build testen.
+Offen: CI-Build testen, erster Lauf gegen echte Fahrzeugdaten.

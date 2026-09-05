@@ -48,21 +48,32 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
   `.storage` wird vor dem OTP-Schritt angelegt; `reconfigure` setzt `remote_commands=False`, daher `_force_otp`.
 - Offline-Test: `tests/smoke_web.py` (aiohttp-TestClient, Fake-Client, 44 Checks).
 
+## Runtime (Schritt 3, fertig)
+- `app/runtime.py`: `Runtime.start()` = Rest von Upstream-`async_setup_entry`: `scheduled_tokens_refresh` →
+  `get_user_vehicles` → `prune_stored_vehicle_configs` → Coordinator je Fahrzeug → `bridge.attach` →
+  `stagger_first_poll` → `coordinator.start()`. Idempotent; API-Fehler → Retry nach 60 s; Auth-Fehler
+  (`coordinator.on_auth_failed`) → `flow.reauth()` + Notification, nach Neu-Login startet `on_configured`
+  die gestoppten Coordinators wieder (`coordinator.start()` startet beendete Loops neu).
+- `app/main.py`: MQTT-Zugang aus `options.mqtt` oder `STELLANTIS_MQTT_*` (Supervisor-Service via `run`);
+  ohne Broker läuft alles, nur ohne Publishing. `ADDON_VERSION` kommt aus `BUILD_VERSION` (Dockerfile).
+- Offline-Test: `tests/smoke_runtime.py`.
+
+## Erkenntnisse aus dem echten Login (05.09.2026)
+- Die Playwright-Headless-Shell wird vom Stellantis-IdP erkannt: Gigya-Login klappt, aber der
+  ForgeRock-Schritt `POST /am/json/authenticate` endet nach 30 s auf `#failedLogin`. Mit echtem
+  Chromium im neuen Headless-Modus (`channel="chromium"`, kein gefälschter UA) kommt der Code.
+- `browser.close()` hängt unter Windows/Python 3.14 grundsätzlich → alle Teardown-Schritte sind auf
+  10 s begrenzt, `pw.stop()` räumt auf. Im Linux-Container nicht beobachtet.
+- Diagnose ohne Add-on: `python app/oauth_browser/login.py --email …` (fragt Passwort ab, listet URLs).
+
 ## Stand
-Schritte 1 (Discovery-Mapping) und 2 (Ingress-UI mit Login/OTP) umgesetzt und offline getestet.
-`main.py` startet Flow und UI, startet aber noch keine Fahrzeuge. Docker-Build und CI ungetestet.
-Bekannte Lücken: `entity_picture` des Fahrzeugs (HA verlangt absolute URL); der Chromium-Login
-(`oauth_browser`) ist nur gegen die echte Stellantis-Seite testbar.
+Schritte 1–3 umgesetzt und offline getestet; echter Login per Chromium verifiziert (Code erhalten).
+Docker-Build und CI ungetestet. Bekannte Lücke: `entity_picture` des Fahrzeugs (HA verlangt absolute URL).
 
 ## Nächste Schritte
-3. `app/main.py`: Wiring — in `on_configured` bzw. beim Start mit `flow.step == "done"`:
-   `scheduled_tokens_refresh` → `get_user_vehicles` → `prune_stored_vehicle_configs` →
-   `async_get_coordinator` → `bridge.attach` → `stagger_first_poll` → `coordinator.start()`;
-   `coordinator.on_auth_failed` → `flow.reauth()` + Notification; `state["vehicles"]` befüllen;
-   MQTT-Zugang aus `STELLANTIS_MQTT_*` (setzt `rootfs/.../run`) lesen, nicht nur aus `options.mqtt`;
-   `bridge.on_connection_change` → `state["mqtt"]`. Ein Neu-Login (reauth) muss laufende Coordinators
-   weiterverwenden (Tokens liegen in `stellantis._config`).
-4. Docker-Build lokal, dann CI.
+4. Docker-Build lokal, dann CI (`playwright install --with-deps chromium` muss auch das volle Chromium
+   liefern, nicht nur die Headless-Shell — `channel="chromium"` im Container prüfen).
+5. Erster Lauf gegen echte Fahrzeugdaten: Status-JSON mit den `value_map`s abgleichen.
 
 ## Lokal starten
     cd stellantis_vehicles && pip install -r requirements.txt
