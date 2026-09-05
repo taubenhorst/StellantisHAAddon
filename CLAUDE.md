@@ -13,6 +13,9 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
 - Inline-Kommentare im Code auf Englisch, Doku auf Deutsch.
 - Base-Image Debian (Playwright braucht glibc), Images werden per CI vorgebaut.
 
+## Weitere Doku
+- `docs/PLANUNG.md`: vollständiges Planungsprotokoll mit Analyse, Entscheidungen, Risiken
+
 ## Stand
 Skelett, siehe `stellantis_vehicles/CHANGELOG.md`. Import-Smoke-Test des Upstream-Clients
 über den Shim läuft; Docker-Build und CI noch ungetestet.
