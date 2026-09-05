@@ -18,6 +18,7 @@ Diagnostics without the add-on (asks for the password, prints every URL seen):
 import asyncio
 import logging
 import os
+import re
 import time
 from urllib.parse import parse_qs, urlsplit
 
@@ -151,13 +152,15 @@ async def fetch_oauth_code(oauth_url: str, email: str, password: str,
             _LOGGER.debug("Consent submitted, waiting for app redirect")
 
         consent_task = loop.create_task(wait_consent())
+        # Wrappers so asyncio.wait() never cancels the shared futures; they are
+        # cancelled below, otherwise they linger as pending tasks.
+        code_wait = asyncio.ensure_future(asyncio.shield(code_future))
+        failure_wait = asyncio.ensure_future(asyncio.shield(failure_future))
         try:
             # Whatever comes first: the code, the IdP's failure page or the
             # consent form (after which the code follows).
             done, _ = await asyncio.wait(
-                [asyncio.ensure_future(asyncio.shield(code_future)),
-                 asyncio.ensure_future(asyncio.shield(failure_future)),
-                 consent_task],
+                [code_wait, failure_wait, consent_task],
                 timeout=timeout_s, return_when=asyncio.FIRST_COMPLETED)
             if failure_future.done():
                 await _dump_debug(page, debug_dir)
@@ -176,8 +179,9 @@ async def fetch_oauth_code(oauth_url: str, email: str, password: str,
                     raise OauthBrowserError("No authorization code captured (timeout)") from err
             return code_future.result()
         finally:
-            if not consent_task.done():
-                consent_task.cancel()
+            for task in (consent_task, code_wait, failure_wait):
+                if not task.done():
+                    task.cancel()
     finally:
         if browser is not None:
             await _bounded(browser.close(), CLOSE_TIMEOUT_S, "browser.close()")
@@ -193,20 +197,17 @@ async def _launch(pw):
         _LOGGER.debug("Chromium (new headless) %s", browser.version)
         return browser
     except Exception as err:  # noqa: BLE001
-        _LOGGER.warning("Full Chromium not available (%s), using headless shell", str(err).splitlines()[0])
+        _LOGGER.warning("Full Chromium not available (%s), using headless shell",
+                        (str(err).splitlines() or [repr(err)])[0])
         browser = await pw.chromium.launch(headless=True, args=CHROMIUM_ARGS)
         _LOGGER.debug("Chromium headless shell %s", browser.version)
         return browser
 
 
-_TOKEN_RE = None
+_TOKEN_RE = re.compile(r'("(?:authId|tokenId|token|code|password|IDToken\d|input)"\s*:\s*")([^"]{6,})"')
 
 
 def _redact_tokens(text: str) -> str:
-    global _TOKEN_RE  # noqa: PLW0603
-    import re
-    if _TOKEN_RE is None:
-        _TOKEN_RE = re.compile(r'("(?:authId|tokenId|token|code|password|IDToken\d|input)"\s*:\s*")([^"]{6,})"')
     return _TOKEN_RE.sub(lambda m: f'{m.group(1)}{m.group(2)[:6]}…"', text)
 
 

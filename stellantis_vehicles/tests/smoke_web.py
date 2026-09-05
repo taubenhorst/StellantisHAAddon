@@ -150,6 +150,11 @@ async def main():
     check(flow2.step == STEP_DONE, "fully configured -> done")
     flow3 = SetupFlow(hass, stellantis, {**options, "remote_commands": False})
     check(flow3.step == STEP_DONE, "remote not wanted -> done")
+    check(hass.config_entries.entry.data["remote_commands"] is False and stellantis.remote_commands is False,
+          "option remote_commands=false overrides the stored flag at startup")
+    stellantis.update_stored_config("remote_commands", True)
+    stellantis.save_config({"remote_commands": True})
+    check(SetupFlow(hass, stellantis, options).step == STEP_DONE and stellantis.remote_commands, "option true leaves stored flag alone")
 
     print("disable / reconfigure remote")
     await client.post("/remote/disable", allow_redirects=False)

@@ -57,6 +57,7 @@ class VehicleBinding:
         self.published: dict[str, tuple] = {}
         self.vehicle_available: bool | None = None
         self.discovery_topics: set[str] = set()
+        self.remote_commands: bool | None = None
 
     @property
     def vin(self) -> str:
@@ -115,9 +116,16 @@ class MqttBridge:
         self._client.loop_start()
 
     def disconnect(self) -> None:
-        self._publish(self.status_topic, "offline", retain=True)
-        self._client.loop_stop()
+        # A clean DISCONNECT suppresses the last will, so the offline status
+        # must be delivered before the network thread stops.
+        if self._connected:
+            try:
+                info = self._client.publish(self.status_topic, "offline", qos=1, retain=True)
+                info.wait_for_publish(timeout=5)
+            except (ValueError, RuntimeError) as err:
+                _LOGGER.debug("Could not publish offline status: %s", err)
         self._client.disconnect()
+        self._client.loop_stop()
         self._connected = False
 
     def _on_connect(self, client, _userdata, _flags, rc) -> None:
@@ -152,10 +160,17 @@ class MqttBridge:
     async def attach(self, coordinator) -> VehicleBinding:
         """Register a vehicle: build entities, publish discovery, follow updates."""
         vin = coordinator.vin
-        if vin in self._bindings:
-            return self._bindings[vin]
         remote_commands = coordinator.stellantis.remote_commands
+        existing = self._bindings.get(vin)
+        if existing is not None:
+            if existing.remote_commands == remote_commands:
+                return existing
+            # Remote commands were switched on/off: rebuild the entity set
+            # (upstream reloads the config entry for this).
+            _LOGGER.info("Remote commands for %s now %s, rebuilding entities", vin, remote_commands)
+            await self.detach(vin, remove=True)
         binding = VehicleBinding(coordinator, build_entities(coordinator, remote_commands))
+        binding.remote_commands = remote_commands
         for entity in binding.entities:
             if entity.writable:
                 binding.by_command_topic[self.entity_topic(vin, entity, "set")] = entity

@@ -410,6 +410,12 @@ class LastChargeSensor(Entity):
                 attributes[attribute] = attributes[attribute].replace(f" {self.UNITS[attribute]}", "")
 
         prev_in_progress = bool(attributes.get("in_progress"))
+        if prev_in_progress and not isinstance(self.native_value, datetime):
+            # Stored data is inconsistent (in_progress without a start time):
+            # drop it, otherwise neither the end nor the next start is detected.
+            _LOGGER.warning("Dropping inconsistent last_charge data for %s", self.vin)
+            attributes = {}
+            prev_in_progress = False
 
         divide = 1000
         if sensors.get("switch_battery_values_correction", False):
@@ -666,7 +672,17 @@ class Number(StoredEntity):
         except ValueError:
             _LOGGER.warning("Ignoring non-numeric payload %r for number %s", payload, self.key)
             return
-        await self.set_value(value)
+        # min/max from the discovery payload are enforced by the HA UI only;
+        # raw publishes on the command topic must not bypass them.
+        low, high = self.discovery.get("min"), self.discovery.get("max")
+        clamped = value
+        if low is not None:
+            clamped = max(float(low), clamped)
+        if high is not None:
+            clamped = min(float(high), clamped)
+        if clamped != value:
+            _LOGGER.warning("Value %s for number %s outside %s..%s, using %s", value, self.key, low, high, clamped)
+        await self.set_value(clamped)
 
 
 class Switch(StoredEntity):

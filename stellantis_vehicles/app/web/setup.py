@@ -75,6 +75,10 @@ class SetupFlow:
         # `notifications` is stored, so persist them before the first step.
         if FIELD_NOTIFICATIONS not in self.entry:
             self._store({FIELD_NOTIFICATIONS: True, FIELD_ANONYMIZE_LOGS: True})
+        # The add-on option `remote_commands: false` wins over the stored flag;
+        # `true` leaves the decision to the stored flag / the ingress page.
+        if not self.remote_commands_wanted and self.entry.get(FIELD_REMOTE_COMMANDS) is not False:
+            self._stellantis.disable_remote_commands()
         # Where the user is in the flow, derived from the stored config
         self.step = self._derive_step()
 
@@ -246,10 +250,8 @@ class SetupFlow:
                                  debug_dir=self._hass.config.path("oauth_debug")),
                 timeout=240)
         except asyncio.TimeoutError as err:
-            await self._stellantis.hass_notify("get_oauth_code")
             raise SetupError(self._error_message("get_oauth_code", "timeout")) from err
         except Exception as err:  # noqa: BLE001
-            await self._stellantis.hass_notify("get_oauth_code")
             raise SetupError(self._error_message("get_oauth_code", err)) from err
         await self._finish_login(oauth_code)
 

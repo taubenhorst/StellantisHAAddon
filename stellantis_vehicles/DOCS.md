@@ -27,7 +27,7 @@ Requires Home Assistant 2025.10 or newer (MQTT discovery with `default_entity_id
 | `country_code` | Two-letter country code of the account |
 | `email`, `password` | Stellantis credentials, used locally only |
 | `oauth_mode` | `browser` (automatic) or `manual` |
-| `remote_commands` | Enable remote commands (requires OTP) |
+| `remote_commands` | Enable remote commands (requires OTP). `false` switches them off at every start; `true` leaves the decision to the ingress page ("Continue without remote commands" / "Reconfigure remote commands") |
 | `language` | Language of the entity names and the ingress page |
 | `mqtt.*` | Leave empty to use the broker provided by the Supervisor |
 

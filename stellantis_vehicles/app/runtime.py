@@ -68,11 +68,12 @@ class Runtime:
                     self._coordinators[vehicle["vin"]] = coordinator
                     coordinator.on_auth_failed = lambda: self._auth_failed("token rejected while polling")
                     coordinator.add_listener(self._update_state)
-                    if self._bridge:
-                        await self._bridge.attach(coordinator)
                     if index and len(vehicles) > 1:
                         # Spread the polls of several vehicles across the interval
                         coordinator.stagger_first_poll(index * UPDATE_INTERVAL / len(vehicles))
+                if self._bridge:
+                    # Idempotent; rebuilds the entities when remote commands were toggled
+                    await self._bridge.attach(coordinator)
                 if not coordinator.running:
                     coordinator.start()
             self._update_state(None)
@@ -104,5 +105,6 @@ class Runtime:
             }
             for coordinator in self._coordinators.values()
         ]
-        if any(c.running for c in self._coordinators.values()):
+        # Only once every vehicle polls again; a single failed one must keep the hint
+        if self._coordinators and all(c.running for c in self._coordinators.values()):
             self._state.pop("auth", None)

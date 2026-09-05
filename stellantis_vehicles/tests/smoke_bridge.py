@@ -198,6 +198,10 @@ async def main():
     check(av("switch/battery_charging_limit") == "offline", "charge-limit switch unavailable without limit")
 
     print("commands")
+    await bridge._dispatch_command(f"stellantis/{VIN}/number/battery_charging_limit/set", "150")
+    check(s("number/battery_charging_limit") == "95.0", f"number clamped to max: {s('number/battery_charging_limit')}")
+    await bridge._dispatch_command(f"stellantis/{VIN}/number/refresh_interval/set", "1")
+    check(s("number/refresh_interval") == "30.0" and coordinator._current_interval() == 30.0, "refresh interval clamped to min")
     await bridge._dispatch_command(f"stellantis/{VIN}/number/battery_charging_limit/set", "80")
     check(s("number/battery_charging_limit") == "80.0", "number set")
     check(stellantis.get_vehicle_stored_config(VIN, "number_battery_charging_limit") == 80.0, "number persisted in stored config")
@@ -250,6 +254,30 @@ async def main():
     stellantis.status = stopped
     await coordinator.async_refresh()
     check(recorder.published[f"stellantis/{VIN}/available"] == "online", "vehicle back online")
+
+    print("inconsistent last_charge data")
+    from bridge.entities import LastChargeSensor
+    lc_entity = next(e for e in binding.entities if isinstance(e, LastChargeSensor))
+    lc_entity.native_value = None
+    lc_entity.attributes = {"in_progress": True, "initial_percentage": "50 %"}
+    stellantis.status = copy.deepcopy(STATUS)  # charging again
+    stellantis.status["updatedAt"] = "2026-09-05T14:00:00Z"
+    await coordinator.async_refresh()
+    lc = a("last_charge")
+    check(lc.get("in_progress") is True and lc.get("initial_percentage") == "67 %" and s("last_charge") != "None",
+          f"stale in_progress dropped, new charge start detected: {lc}")
+
+    print("remote commands toggled")
+    n_before = len(binding.entities)
+    stellantis.save_config({"remote_commands": False})
+    binding2 = await bridge.attach(coordinator)
+    check(binding2 is not binding and len(binding2.entities) < n_before, f"entities rebuilt: {n_before} -> {len(binding2.entities)}")
+    check(recorder.published[f"homeassistant/button/stellantis_{VIN}/doors_lock/config"] == "", "button discovery cleared")
+    check(not any("/button/" in t for t in recorder.subscribed[len(recorder.subscribed) - len(binding2.by_command_topic):]), "no button command topics re-subscribed")
+    check(len(coordinator._listeners) == 1, "listener not duplicated")
+    stellantis.save_config({"remote_commands": True})
+    binding = await bridge.attach(coordinator)
+    check(len(binding.entities) == n_before and recorder.published[f"homeassistant/button/stellantis_{VIN}/doors_lock/config"] != "", "entities restored when enabled again")
 
     print("detach")
     await bridge.detach(VIN, remove=True)
