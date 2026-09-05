@@ -1,51 +1,68 @@
 # Stellantis HA Add-ons
 
-Home-Assistant-Add-on-Repository mit einem einzigen Add-on: **Stellantis Vehicles**.
-Es fasst die HACS-Integration [homeassistant-stellantis-vehicles](https://github.com/andreadegiovine/homeassistant-stellantis-vehicles)
-und den zugehörigen OAuth-Login-Worker in einem Container zusammen. Fahrzeugdaten
-kommen per MQTT Discovery in Home Assistant an, der Browser-Login läuft lokal statt
-auf einem fremden Server.
+Home Assistant add-on repository with a single add-on: **Stellantis Vehicles**.
+It bundles the HACS integration [homeassistant-stellantis-vehicles](https://github.com/andreadegiovine/homeassistant-stellantis-vehicles)
+and its OAuth login worker in one container. Vehicle data reaches Home Assistant via
+MQTT discovery; the browser login runs locally inside the add-on instead of on a
+third-party server.
+
+Supported brands are the ones the upstream integration supports: Peugeot, Citroën, DS,
+Opel and Vauxhall (the former PSA apps). Fiat, Jeep, Alfa Romeo and the other FCA brands
+use a different backend and are not covered.
 
 ## Installation
 
-Einstellungen → Add-ons → Add-on Store → ⋮ → Repositories →
+Settings → Add-ons → Add-on Store → ⋮ → Repositories →
 `https://github.com/taubenhorst/StellantisHAAddon`
 
-Voraussetzungen: Mosquitto-Broker-Add-on und MQTT-Integration in Home Assistant.
+Requirements: the Mosquitto broker add-on and the MQTT integration in Home Assistant,
+Home Assistant 2025.10 or newer.
 
-## Aufbau
+## Layout
 
 ```
 stellantis_vehicles/
-├── config.yaml / build.yaml / Dockerfile     Add-on-Packaging
-├── rootfs/etc/services.d/stellantis/run     s6-Service
+├── config.yaml / build.yaml / Dockerfile     add-on packaging
+├── rootfs/etc/services.d/stellantis/run     s6 service
+├── tests/                                   offline smoke tests
 └── app/
-    ├── main.py               Einstieg
-    ├── hass_shim/            Minimal-Ersatz für das `homeassistant`-Paket
-    ├── stellantis_vehicles/  Upstream-Code (unverändert, siehe UPSTREAM.md) + eigenes base.py
-    ├── bridge/               MQTT-Discovery-Bridge
-    ├── oauth_browser/        Playwright-Login (Clean-Room)
-    └── web/                  Ingress-UI
+    ├── main.py               entry point
+    ├── runtime.py            vehicles, coordinators, bridge wiring
+    ├── hass_shim/            minimal stand-in for the `homeassistant` package
+    ├── stellantis_vehicles/  upstream code (unchanged, see UPSTREAM.md) + own base.py
+    ├── bridge/               MQTT discovery bridge
+    ├── oauth_browser/        Playwright login (clean-room)
+    └── web/                  ingress UI (login, OTP, status)
 ```
 
-Entwurfsprinzip: der Upstream-Code bleibt unverändert, die HA-Abhängigkeiten liefert
-`hass_shim/`. Upstream-Fixes lassen sich damit durch Kopieren der Dateien übernehmen.
+Design principle: the upstream code stays untouched, its Home Assistant dependencies are
+provided by `hass_shim/`. Upstream fixes can therefore be taken over by copying files.
 
-## Entwicklung
+## Development
 
 ```bash
 cd stellantis_vehicles
 pip install -r requirements.txt
-DATA_DIR=./data python app/main.py
+python -m playwright install chromium
+python app/main.py          # uses ./data as data directory, UI on http://localhost:8099/
 ```
 
-Lokaler Image-Build: siehe `build.yaml`; CI baut aarch64 und amd64 nach GHCR.
+Offline tests (no network, no broker):
+
+```bash
+python tests/smoke_bridge.py
+python tests/smoke_web.py
+python tests/smoke_runtime.py
+```
+
+Local image build: `docker build --build-arg BUILD_VERSION=0.1.0 -t stellantis-vehicles:dev stellantis_vehicles`.
+CI builds aarch64 and amd64 images and pushes them to GHCR.
 
 ## Status
 
-Funktionsfähig (Login, OTP, Statusabruf, MQTT-Discovery), Images werden per CI nach GHCR gebaut —
-siehe `stellantis_vehicles/CHANGELOG.md`. Noch nicht auf einem Pi im Dauerbetrieb getestet.
+Working end to end (login, OTP, vehicle status, MQTT discovery), images are built by CI —
+see `stellantis_vehicles/CHANGELOG.md`. Not yet tested in long-term operation on a Pi.
 
-## Lizenz
+## License
 
-MIT, siehe `LICENSE`. Upstream-Anteile ebenfalls MIT (Andrea De Giovine).
+MIT, see `LICENSE`. Upstream parts are MIT as well (Andrea De Giovine).

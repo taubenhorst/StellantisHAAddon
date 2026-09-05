@@ -1,28 +1,27 @@
 ## 0.1.0
 
-Skelett — noch nicht lauffähig als Add-on.
+First working version.
 
-- Repo-Struktur, `config.yaml`, Debian-basiertes Dockerfile mit Playwright/Chromium
-- Upstream-Code (stellantis.py, otp, const, utils) unverändert vendored, Commit 69fddda
-- `hass_shim`: Ersatz für die genutzten `homeassistant`-Imports
-- Eigener Coordinator (`base.py`): Port der Upstream-Logik ohne HA (Polling, Command-History,
-  Fernbefehle, Ladelimit, ABRP, letzte Fahrt)
-- MQTT-Discovery-Bridge (`bridge/`): alle Upstream-Entities (sensor, binary_sensor, button,
-  number, switch, text, device_tracker) als HA-Gerät pro Fahrzeug; Command-Topics für Buttons,
-  Zahlen, Schalter, Texte und die Ladestartzeit
-- Clean-Room-Playwright-Login in `oauth_browser/`
-- Ingress-UI (`web/`): Login (Chromium im Add-on oder manuell per Code/URL), OTP-Einrichtung
-  per SMS-Code + PIN, Statusseite mit Token-Laufzeiten, Fahrzeugen, Benachrichtigungen;
-  Fernbefehle deaktivieren/neu einrichten, Neu-Anmeldung
-- Runtime (`runtime.py`): Fahrzeuge laden, Coordinators starten, Bridge anbinden, Retry bei
-  API-Fehlern, Neu-Login bei abgelaufener Anmeldung ohne Neustart
-- MQTT-Broker aus den Optionen oder vom Supervisor (`services: mqtt`)
-- Offline-Smoke-Tests `tests/smoke_bridge.py`, `tests/smoke_web.py`, `tests/smoke_runtime.py`
-- `mobile_app` auf die vom Upstream unterstützten Apps beschränkt
+- Repository layout, `config.yaml`, Debian based Dockerfile with Playwright/Chromium
+- Upstream code (stellantis.py, otp, const, utils) vendored unchanged, commit 69fddda
+- `hass_shim`: stand-in for the `homeassistant` imports the upstream code uses
+- Own coordinator (`base.py`): port of the upstream logic without HA (polling, command
+  history, remote commands, charge limit, ABRP, last trip)
+- MQTT discovery bridge (`bridge/`): all upstream entities (sensor, binary_sensor, button,
+  number, switch, text, device_tracker) as one HA device per vehicle; command topics for
+  buttons, numbers, switches, texts and the charge start time
+- Ingress UI (`web/`): login (Chromium inside the add-on or manual via code/URL), OTP setup
+  with SMS code + PIN, status page with token expiry, vehicles, notifications; disable or
+  reconfigure remote commands, re-login
+- Runtime (`runtime.py`): load vehicles, start coordinators, attach the bridge, retry on API
+  errors, re-login after an expired session without restart
+- MQTT broker from the options or from the Supervisor (`services: mqtt`)
+- Clean-room Playwright login in `oauth_browser/`; real Chromium in the new headless mode
+  (the headless shell is rejected by the Stellantis identity provider)
+- Offline smoke tests `tests/smoke_bridge.py`, `tests/smoke_web.py`, `tests/smoke_runtime.py`
+- `mobile_app` restricted to the apps supported upstream
+- Real login and status retrieval verified; vehicle picture as `entity_picture`
+- Docker image built and started locally (amd64, 1.9 GB); `.dockerignore`
+- CI builds amd64 and aarch64 images to GHCR
 
-- Echter Login und Statusabruf verifiziert; Fahrzeugbild als `entity_picture`
-- Docker-Image lokal gebaut und gestartet (amd64, 1,9 GB); `.dockerignore`
-
-- CI baut amd64 und aarch64 nach GHCR
-
-Offen: Installation auf dem Pi.
+Open: installation on the Pi.

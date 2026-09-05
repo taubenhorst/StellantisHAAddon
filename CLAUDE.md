@@ -10,12 +10,13 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
   `app/hass_shim/` nachrüsten. Ausnahme: `base.py` ist eigen.
 - Kein Code aus `homeassistant-stellantis-vehicles-worker-v2` übernehmen (keine Lizenz);
   `app/oauth_browser/` ist Clean-Room und bleibt es.
-- Inline-Kommentare im Code auf Englisch, Doku auf Deutsch.
+- Inline-Kommentare im Code auf Englisch. Nutzerseitige Doku (README.md, DOCS.md, CHANGELOG.md,
+  config.yaml-Beschreibung) auf Englisch; interne Doku (CLAUDE.md, docs/PLANUNG.md) auf Deutsch.
 - Base-Image Debian (Playwright braucht glibc), Images werden per CI vorgebaut.
 
 ## Weitere Doku
 - `docs/PLANUNG.md`: vollständiges Planungsprotokoll mit Analyse, Entscheidungen, Risiken
-- `stellantis_vehicles/DOCS.md`: Nutzerdoku inkl. MQTT-Topic-Schema
+- `stellantis_vehicles/DOCS.md`: Nutzerdoku (englisch) inkl. MQTT-Topic-Schema
 
 ## Aufbau der Bridge (Schritt 1, fertig)
 - `app/stellantis_vehicles/base.py`: Port des Upstream-Coordinators (Polling, updatedAt-Vergleich,
