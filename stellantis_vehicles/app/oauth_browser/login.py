@@ -75,12 +75,14 @@ async def _bounded(coro, timeout: float, what: str) -> None:
 
 async def fetch_oauth_code(oauth_url: str, email: str, password: str,
                            timeout_s: float = 60.0, debug_dir: str | None = None,
-                           on_event=None) -> str:
+                           on_event=None, locale: str | None = None) -> str:
     """Return the OAuth authorization code for the given credentials.
 
-    ``debug_dir``: if set, a screenshot and the final URL are written there
-    when no code could be captured. ``on_event(source, url)`` is called for
-    every URL seen (diagnostics CLI).
+    ``locale``: browser locale (e.g. ``de-DE``), normally the one of the
+    account's country from the app configuration. ``debug_dir``: if set, a
+    screenshot and the final URL are written there when no code could be
+    captured. ``on_event(source, url)`` is called for every URL seen
+    (diagnostics CLI).
     """
     try:
         from playwright.async_api import async_playwright
@@ -129,7 +131,8 @@ async def fetch_oauth_code(oauth_url: str, email: str, password: str,
     page = None
     try:
         browser = await _launch(pw)
-        context = await browser.new_context(viewport={"width": 1280, "height": 720}, locale="de-DE")
+        context = await browser.new_context(viewport={"width": 1280, "height": 720},
+                                            locale=locale or "en-US")
         page = await context.new_page()
         page.on("request", lambda r: seen("request", r.url))
         page.on("requestfailed", lambda r: seen("requestfailed", r.url))
@@ -268,7 +271,8 @@ def _cli() -> None:  # pragma: no cover - manual diagnostics
         events: list[tuple[str, str]] = []
         try:
             code = await fetch_oauth_code(url, args.email, password, args.timeout, args.debug_dir,
-                                          on_event=lambda s, u: events.append((s, u)))
+                                          on_event=lambda s, u: events.append((s, u)),
+                                          locale=client.get_config("locale"))
         except OauthBrowserError as err:
             print("FEHLER:", err)
             code = None

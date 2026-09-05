@@ -247,7 +247,8 @@ class SetupFlow:
             # Hard upper bound: several page steps of 60s each plus teardown.
             oauth_code = await asyncio.wait_for(
                 fetch_oauth_code(self._stellantis.get_oauth_url(), email, password,
-                                 debug_dir=self._hass.config.path("oauth_debug")),
+                                 debug_dir=self._hass.config.path("oauth_debug"),
+                                 locale=self._stellantis.get_config("locale")),
                 timeout=240)
         except asyncio.TimeoutError as err:
             raise SetupError(self._error_message("get_oauth_code", "timeout")) from err

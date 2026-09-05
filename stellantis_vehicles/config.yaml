@@ -40,7 +40,7 @@ schema:
   password: password
   oauth_mode: list(browser|manual)
   remote_commands: bool
-  language: list(en|de)
+  language: list(en|de|cz|da|es|fi|fr|it|nb|nl|no|pl|pt|sv)
   log_level: list(debug|info|warning|error)
   mqtt:
     host: str?

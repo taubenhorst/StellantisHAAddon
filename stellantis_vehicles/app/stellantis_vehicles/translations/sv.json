@@ -1,0 +1,344 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "mobile_app": "Fordonets mobilapp"
+        }
+      },
+      "country": {
+        "data": {
+          "country_code": "Din landskod"
+        }
+      },
+      "oauth_mode": {
+        "description": "För att autentisera ditt konto kommer en extern tjänst användas. Dina credentials kommer ej att sparas av tjänsten. Alternativt kan du använda den manuella metoden.",
+        "data": {
+          "oauth_manual_mode": "Använd manuell metod"
+        }
+      },
+      "oauth_remote": {
+        "description": "Den här tjänsten [remote service]({oauth_remote_link}) simulerar en webbläsarinloggning mot den officiella webbplatsen",
+        "data": {
+          "email": "E-post",
+          "password": "Lösenord"
+        }
+      },
+      "oauth_manual": {
+        "description": "Följ dessa steg från **desktop browser**:\n\n1. Gå till {oauth_link} inloggningssida\n2. Öppna webläsarens **DevTools** (F12) och går till fliken **Network**\n3. Logga in på ditt konto och klicka på sista bekräftelseknappen\n4. Från **Network** tabben hitta följande request och kopiera **{oauth_label}**{oauth_devtools}",
+        "data": {
+          "oauth_code": "OAuth kod"
+        }
+      },
+      "get_access_token": {
+        "description": "**Authentication completed**.\nFör att använda remote commands, markera alternativet nedanför och gör klart OTP steget",
+        "data": {
+          "remote_commands": "Konfigurera remote commands (E-remote eller Connect Plus krävs)"
+        }
+      },
+      "otp": {
+        "data": {
+          "sms_code": "SMS kod från Stellantis",
+          "pin_code": "Pinkod från fordonets mobilapp"
+        }
+      },
+      "reauth_confirm": {
+        "description": "Du behöver autentisera dig igen för att använda integrationen"
+      }
+    },
+    "error": {
+      "get_oauth_code": "Fel vid hämtning av oauth kod",
+      "get_access_token": "Fel vid hämtning av access token",
+      "get_user_info": "Fel vid hämtning av användarinformation",
+      "missing_user_info": "Saknar användardata",
+      "get_otp_sms": "Fel vid OTP SMS aktivering",
+      "get_mqtt_access_token": "MQTT access token fel",
+      "get_mqtt_access_token_nok_access": "Felaktig SMS-kod eller pinkod",
+      "get_mqtt_access_token_nok_maxnbtools": "Gräns för antalet kopplade enheter / SMS mottaget, gör reset av ditt Stellantis konto och försök igen",
+      "get_mqtt_access_token_nok_nok_blocked": "Gräns för felaktiga PIN-koder nådd, starta om konfigureringen",
+      "get_mqtt_access_token_rate_limit": "Rate limit för MQTT access token-förfrågningar har nåtts (6 per dag)"
+    },
+    "abort": {
+      "already_configured": "Kontot är redan konfigurerat",
+      "reauth_successful": "Re-authentication lyckades",
+      "reconfigure_successful": "Konfigureringen lyckades"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "service_battery_voltage": {
+        "name": "Service batteri"
+      },
+      "type": {
+        "name": "Typ",
+        "state": {
+          "electric": "Elektrisk",
+          "hybrid": "Hybrid",
+          "thermic": "Förbränningsmotor",
+          "hydrogen": "Bränslecell"
+        }
+      },
+      "temperature": {
+        "name": "Temperatur"
+      },
+      "mileage": {
+        "name": "Miltal",
+        "state_attributes": {
+          "last_updated": {
+            "name": "Senast uppdaterad"
+          }
+        }
+      },
+      "speed": {
+        "name": "Hastighet"
+      },
+      "autonomy": {
+        "name": "Räckvidd"
+      },
+      "battery": {
+        "name": "Batteri"
+      },
+      "battery_soh": {
+        "name": "Batteri SOH"
+      },
+      "battery_charging_rate": {
+        "name": "Batteri laddningshastighet"
+      },
+      "battery_charging_type": {
+        "name": "Batteri laddningstyp",
+        "state": {
+          "no": "Laddar ej",
+          "slow": "Långsam",
+          "quick": "Snabb"
+        }
+      },
+      "battery_charging_end": {
+        "name": "Batteriladdning klar"
+      },
+      "battery_capacity": {
+        "name": "Batteri kapacitet"
+      },
+      "battery_residual": {
+        "name": "Batteri kvarvarande kapacitet"
+      },
+      "command_status": {
+        "name": "Kommando",
+        "state": {
+          "rate_limit": "Rate limit överskriden (6 per 20 minuter)",
+          "not_compatible": "Ej kompatibel",
+          "failed": "Misslyckad",
+          "900": "Accepterad",
+          "901": "Väcker fordonet",
+          "903": "Skickat till fordonet",
+          "0": "Klar",
+          "300": "Tidsgräns överskriden",
+          "500": "Fel",
+          "502": "Duplikat",
+          "422": "Sekretess påslagen"
+        }
+      },
+      "fuel": {
+        "name": "Bränsle"
+      },
+      "fuel_autonomy": {
+        "name": "Bränsleräckvidd"
+      },
+      "fuel_consumption_total": {
+        "name": "Bränsleförbrukning total"
+      },
+      "fuel_consumption_instant": {
+        "name": "Bränsleförbrukning senaste"
+      },
+      "coolant_temperature": {
+        "name": "Kylvätsketemperatur"
+      },
+      "oil_temperature": {
+        "name": "Oljetemperatur"
+      },
+      "air_temperature": {
+        "name": "Lufttemperatur"
+      },
+      "last_trip": {
+        "name": "Senaste resan",
+        "state_attributes": {
+          "duration": {
+            "name": "Varaktighet"
+          },
+          "start_mileage": {
+            "name": "Miltal vid start"
+          },
+          "avg_speed": {
+            "name": "Genomsnittshastighet"
+          },
+          "max_speed": {
+            "name": "Maxhastighet"
+          },
+          "electric_consumption": {
+            "name": "Elförbrukning"
+          },
+          "electric_avg_consumption": {
+            "name": "Genomsnittlig elförbrukning"
+          },
+          "fuel_consumption": {
+            "name": "Bränsleförbrukning"
+          },
+          "fuel_avg_consumption": {
+            "name": "Genomsnittlig bränsleförbrukning"
+          }
+        }
+      },
+      "last_charge": {
+        "name": "Senaste laddning",
+        "state_attributes": {
+          "in_progress": {
+            "name": "Pågår",
+            "state": {
+              "true": "Ja"
+            }
+          },
+          "initial_percentage": {
+            "name": "Startprocent"
+          },
+          "initial_energy": {
+            "name": "Startenergi"
+          },
+          "initial_autonomy": {
+            "name": "Starträckvidd"
+          },
+          "final_time": {
+            "name": "Tid vid avslut"
+          },
+          "final_percentage": {
+            "name": "Procent vid avslut"
+          },
+          "final_energy": {
+            "name": "Energi vid avslut"
+          },
+          "final_autonomy": {
+            "name": "Räckvidd vid avslut"
+          },
+          "duration": {
+            "name": "Varaktighet"
+          },
+          "recharged_percent": {
+            "name": "Laddade procent"
+          },
+          "recharged_energy": {
+            "name": "Laddad energi"
+          },
+          "recharged_autonomy": {
+            "name": "Laddad räckvidd"
+          },
+          "avg_power": {
+            "name": "Genomsnittlig effekt"
+          }
+        }
+      }
+    },
+    "binary_sensor": {
+      "moving": {
+        "name": "Kör"
+      },
+      "doors": {
+        "name": "Dörrar"
+      },
+      "battery_plugged": {
+        "name": "Inkopplad"
+      },
+      "battery_charging": {
+        "name": "Laddar"
+      },
+      "engine": {
+        "name": "Motor"
+      },
+      "preconditioning": {
+        "name": "Klimatanläggning"
+      },
+      "alarm": {
+        "name": "Alarm"
+      },
+      "privacy": {
+        "name": "Sekretess"
+      },
+      "remote_commands": {
+        "name": "Remote commands"
+      },
+      "daylight": {
+        "name": "Dagsljus"
+      }
+    },
+    "button": {
+      "wakeup": {
+        "name": "Väck"
+      },
+      "doors_lock": {
+        "name": "Lås dörrar"
+      },
+      "doors_unlock": {
+        "name": "Lås upp dörrar"
+      },
+      "horn": {
+        "name": "Tuta"
+      },
+      "lights": {
+        "name": "Ljus"
+      },
+      "charge_start": {
+        "name": "Starta laddning"
+      },
+      "charge_stop": {
+        "name": "Stoppa laddning"
+      },
+      "preconditioning_start": {
+        "name": "Preconditioning start"
+      },
+      "preconditioning_stop": {
+        "name": "Preconditioning stop"
+      }
+    },
+    "device_tracker": {
+      "vehicle": {
+        "name": "Fordon"
+      }
+    },
+    "number": {
+      "battery_charging_limit": {
+        "name": "Batteri laddningsgräns"
+      },
+      "refresh_interval": {
+        "name": "Uppdateringsfrekvens"
+      }
+    },
+    "switch": {
+      "battery_charging_limit": {
+        "name": "Batteri laddningsgräns"
+      },
+      "abrp_sync": {
+        "name": "ABRP synk"
+      },
+      "battery_values_correction": {
+        "name": "Korrigering av batterivärden"
+      }
+    },
+    "text": {
+      "abrp_token": {
+        "name": "ABRP token"
+      }
+    },
+    "time": {
+      "battery_charging_start": {
+        "name": "Batteriladdning start"
+      }
+    }
+  },
+  "common": {
+    "access_token_error_title": "Access token-fel",
+    "access_token_error_message": "Se officiell dokumentation i [OAuth2 Code]({oauth_token_doc_link}) sektionen",
+    "otp_error_title": "OTP fel",
+    "otp_error_message": "Se officiell dokumentation i [OTP error - NOK:MAXNBTOOLS]({otp_nokmaxnbtools_doc_link}) sektionen",
+    "no_vehicles_found_title": "Otillgänglig",
+    "no_vehicles_found_message": "Inga fordon kopplade till detta konto",
+    "command_error_title": "Command",
+    "command_error_message": "Detta kommando skickades inte korrekt"
+  }
+}

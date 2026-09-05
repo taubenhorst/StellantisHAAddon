@@ -23,5 +23,6 @@ First working version.
 - Real login and status retrieval verified; vehicle picture as `entity_picture`
 - Docker image built and started locally (amd64, 1.9 GB); `.dockerignore`
 - CI builds amd64 and aarch64 images to GHCR
+- All 14 upstream translations, per-key English fallback, browser locale from the app configuration
 
 Open: installation on the Pi.

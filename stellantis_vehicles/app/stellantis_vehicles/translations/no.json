@@ -1,0 +1,143 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "mobile_app": "Kjøretøyets mobilapp"
+        }
+      },
+      "country": {
+        "data": {
+          "country_code": "Din landskode"
+        }
+      },
+      "otp": {
+        "data": {
+          "sms_code": "SMS-kode fra Stellantis",
+          "pin_code": "Pinkode fra kjøretøyets mobilapp"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "service_battery_voltage": {
+        "name": "Servicebatteri"
+      },
+      "type": {
+        "name": "Type",
+        "state": {
+          "electric": "Elektrisk"
+        }
+      },
+      "temperature": {
+        "name": "Temperatur"
+      },
+      "mileage": {
+        "name": "Kilometerstand"
+      },
+      "autonomy": {
+        "name": "Rekkevidde"
+      },
+      "battery": {
+        "name": "Batteri"
+      },
+      "battery_soh": {
+        "name": "Batteri SOH"
+      },
+      "battery_charging_rate": {
+        "name": "Batteri ladehastighet"
+      },
+      "battery_charging_type": {
+        "name": "Batteri ladetype",
+        "state": {
+          "no": "Nei",
+          "slow": "Sakte",
+          "quick": "Hurtig"
+        }
+      },
+      "battery_charging_end": {
+        "name": "Batterilading ferdig"
+      },
+      "battery_capacity": {
+        "name": "Batterikapasitet"
+      },
+      "battery_residual": {
+        "name": "Gjenværende batterikapasitet"
+      },
+      "command_status": {
+        "name": "Kommando",
+        "state": {
+          "not_compatible": "Ikke kompatibel",
+          "900": "Akseptert",
+          "901": "Vekker kjøretøyet",
+          "903": "Sendt til kjøretøyet",
+          "0": "Ferdig",
+          "300": "Tidsavbrudd",
+          "500": "Feil"
+        }
+      },
+      "fuel": {
+        "name": "Drivstoff"
+      },
+      "fuel_autonomy": {
+        "name": "Drivstoffrekkevidde"
+      },
+      "fuel_consumption_total": {
+        "name": "Total drivstofforbruk"
+      },
+      "fuel_consumption_instant": {
+        "name": "Øyeblikkelig drivstofforbruk"
+      }
+    },
+    "binary_sensor": {
+      "moving": {
+        "name": "Kjører"
+      },
+      "doors": {
+        "name": "Dører"
+      },
+      "battery_plugged": {
+        "name": "Tilkoblet"
+      },
+      "battery_charging": {
+        "name": "Lader"
+      },
+      "engine": {
+        "name": "Motor"
+      },
+      "preconditioning": {
+        "name": "Klimaanlegg"
+      },
+      "daylight": {
+        "name": "Dagslys"
+      }
+    },
+    "button": {
+      "wakeup": {
+        "name": "Vekk"
+      },
+      "horn": {
+        "name": "Horn"
+      },
+      "lights": {
+        "name": "Lys"
+      }
+    },
+    "device_tracker": {
+      "vehicle": {
+        "name": "Kjøretøy"
+      }
+    },
+    "number": {
+      "battery_charging_limit": {
+        "name": "Batteri ladegrense"
+      }
+    },
+    "switch": {
+      "battery_charging_limit": {
+        "name": "Batteri ladegrense"
+      }
+    }
+  }
+}

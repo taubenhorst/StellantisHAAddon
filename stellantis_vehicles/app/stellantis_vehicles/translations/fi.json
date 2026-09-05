@@ -1,0 +1,395 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "mobile_app": "Ajoneuvosi sovellus"
+        }
+      },
+      "country": {
+        "data": {
+          "country_code": "Syötä maakoodisi"
+        }
+      },
+      "oauth_mode": {
+        "description": "Tilisi todentamiseksi käytetään palvelua, joka ei tallenna käyttäjätunnuksiasi millään tavalla. Vaihtoehtoisesti voit käyttää manuaalista menetelmää.",
+        "data": {
+          "oauth_manual_mode": "Käytä manuaalista menetelmää"
+        }
+      },
+      "oauth_remote": {
+        "description": "Tätä [palvelua]({oauth_remote_link}) käytetään simuloimaan kirjautumista viralliselle nettisivulle. Voit käyttää oletusarvoista etäpalvelua tai omaa asennustasi.",
+        "data": {
+          "email": "Sähköpostiosoite",
+          "password": "Salasana",
+          "oauth_code_url": "Kirjautumispalvelun URL"
+        }
+      },
+      "oauth_manual": {
+        "description": "Seuraa näitä ohjeita **tietokoneen selaimella**:\n\n1. Mene kirjautumissivulle osoitteessa {oauth_link};\n2. Avaa selaimessa **DevTools** (F12) ja avaa **Network**-välilehti;\n3. Kirjaudu tunnuksillasi ja klikkaa viimeistä vahvistuspainiketta;\n4. Kopioi **Network**-välilehdeltä ylläoleva pyyntö **{oauth_label}**;{oauth_devtools}",
+        "data": {
+          "oauth_code": "OAuth-koodi"
+        }
+      },
+      "get_access_token": {
+        "description": "**Todennus valmis**.\nKäyttääksesi etäkomentoja, kytke alla oleva valintaruutu ja suorita OTP-vaihe loppuun.",
+        "data": {
+          "remote_commands": "Määritä etäkomennot (E-remote tai Connect Plus vaaditaan)"
+        }
+      },
+      "otp": {
+        "data": {
+          "sms_code": "Tekstiviesti Stellantikselta",
+          "pin_code": "Stellantis-sovelluksen PIN-koodi"
+        }
+      },
+      "options": {
+        "data": {
+          "notifications": "Käytä pysyviä ilmoituksia",
+          "anonymize_logs": "Anonymisoi henkilökohtainen data lokitiedostoissa"
+        }
+      },
+      "reauth_confirm": {
+        "description": "Uusi todennus vaaditaan integraation käyttämiseksi"
+      },
+      "reconfigure": {
+        "data": {
+          "reconfigure": "Määritä uudelleen"
+        }
+      }
+    },
+    "error": {
+      "get_oauth_code": "OAuth-koodin haku epäonnistui",
+      "get_access_token": "Tunnuksen haku epäonnistui",
+      "get_user_info": "Käyttäjätietojen haku epäonnistui",
+      "missing_user_info": "Käyttäjätiedot puuttuvat",
+      "get_otp_sms": "OTP-tekstiviestivirhe",
+      "get_mqtt_access_token": "MQTT-todennusvirhe",
+      "get_mqtt_access_token_nok_access": "Virheellinen SMS- tai PIN-koodi",
+      "get_mqtt_access_token_nok_maxnbtools": "Liitettyjen laitteiden / vastaanotettujen tekstiviestien raja saavutettu. Nollaa Stellantis-tilisi ja yritä uudelleen.",
+      "get_mqtt_access_token_nok_nok_blocked": "PIN-koodi syötetty väärin liian monta kertaa. Aloita konfigurointiprosessi uudelleen.",
+      "get_mqtt_access_token_rate_limit": "MQTT-käyttöoikeuspyyntöjen päiväraja ylitetty (6 per päivä)"
+    },
+    "abort": {
+      "already_configured": "Tili on jo käytössä",
+      "reauth_successful": "Uudelleentodennus onnistui",
+      "reconfigure_successful": "Uudelleenmääritys onnistui"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "service_battery_voltage": {
+        "name": "Käynnistysakun varaustaso"
+      },
+      "type": {
+        "name": "Tyyppi",
+        "state": {
+          "electric": "Sähkö",
+          "hybrid": "Hybridi",
+          "thermic": "Polttomoottori",
+          "hydrogen": "Vety"
+        }
+      },
+      "temperature": {
+        "name": "Lämpötila"
+      },
+      "mileage": {
+        "name": "Mittarilukema",
+        "state_attributes": {
+          "last_updated": {
+            "name": "Viimeksi päivitetty"
+          }
+        }
+      },
+      "speed": {
+        "name": "Nopeus"
+      },
+      "autonomy": {
+        "name": "Toimintamatka sähköllä"
+      },
+      "battery": {
+        "name": "Ajoakun varaustaso"
+      },
+      "battery_health_resistance": {
+        "name": "Ajoakun kunto (sisäinen resistanssi)"
+      },
+      "battery_health_capacity": {
+        "name": "Ajoakun kunto (kapasiteetti)"
+      },
+      "battery_charging_rate": {
+        "name": "Ajoakun latausnopeus"
+      },
+      "battery_charging_type": {
+        "name": "Lataustapa",
+        "state": {
+          "no": "Ei",
+          "slow": "Hidas",
+          "quick": "Pika"
+        }
+      },
+      "battery_charging_end": {
+        "name": "Lataus päättyy"
+      },
+      "battery_capacity": {
+        "name": "Ajoakun kapasiteetti"
+      },
+      "battery_residual": {
+        "name": "Ajoakkua jäljellä"
+      },
+      "command_status": {
+        "name": "Käskyn tila",
+        "state": {
+          "rate_limit": "Käyttöraja ylitetty (6 per 20 minuuttia)",
+          "not_compatible": "Ei yhteensopiva",
+          "failed": "Epäonnistui",
+          "900": "Hyväksytty",
+          "901": "Ajoneuvon herätys",
+          "903": "Yhdistetty autoon",
+          "0": "Suoritettu",
+          "300": "Aikakatkaisu",
+          "500": "Virhe",
+          "502": "Duplikaatti",
+          "422": "Yksityisyys käytössä"
+        }
+      },
+      "fuel": {
+        "name": "Polttoaineen taso"
+      },
+      "fuel_autonomy": {
+        "name": "Toimintamatka polttoaineella"
+      },
+      "fuel_consumption_total": {
+        "name": "Kokonaiskulutus"
+      },
+      "fuel_consumption_instant": {
+        "name": "Hetkellinen kulutus"
+      },
+      "coolant_temperature": {
+        "name": "Jäähdytysnesteen lämpötila"
+      },
+      "oil_temperature": {
+        "name": "Öljyn lämpötila"
+      },
+      "air_temperature": {
+        "name": "Ilman lämpötila"
+      },
+      "driving_behavior": {
+        "name": "Ajokäyttäytyminen"
+      },
+      "last_trip": {
+        "name": "Viimeisin matka",
+        "state_attributes": {
+          "duration": {
+            "name": "Kesto"
+          },
+          "start_mileage": {
+            "name": "Lähtökilometrit"
+          },
+          "avg_speed": {
+            "name": "Keskinopeus"
+          },
+          "max_speed": {
+            "name": "Enimmäisnopeus"
+          },
+          "electric_consumption": {
+            "name": "Sähkönkulutus"
+          },
+          "electric_avg_consumption": {
+            "name": "Sähkön keskikulutus"
+          },
+          "fuel_consumption": {
+            "name": "Polttoaineenkulutus"
+          },
+          "fuel_avg_consumption": {
+            "name": "Polttoaineen keskikulutus"
+          }
+        }
+      },
+      "last_charge": {
+        "name": "Viimeisin lataus",
+        "state_attributes": {
+          "in_progress": {
+            "name": "Käynnissä",
+            "state": {
+              "true": "Kyllä"
+            }
+          },
+          "mileage": {
+            "name": "Ajomatka"
+          },
+          "initial_percentage": {
+            "name": "Akun varaustaso aloittaessa"
+          },
+          "initial_energy": {
+            "name": "Akun energiamäärä aloittaessa"
+          },
+          "initial_autonomy": {
+            "name": "Toimintamatka aloittaessa"
+          },
+          "final_time": {
+            "name": "Lopetusaika"
+          },
+          "final_percentage": {
+            "name": "Akun varaustaso lopettaessa"
+          },
+          "final_energy": {
+            "name": "Akun energiamäärä lopettaessa"
+          },
+          "final_autonomy": {
+            "name": "Toimintamatka lopettaessa"
+          },
+          "duration": {
+            "name": "Kesto"
+          },
+          "recharged_percent": {
+            "name": "Lisätty varaustaso"
+          },
+          "recharged_energy": {
+            "name": "Lisätty energiamäärä"
+          },
+          "recharged_autonomy": {
+            "name": "Lisätty toimintamatka"
+          },
+          "avg_power": {
+            "name": "Keskimääräinen latausteho"
+          }
+        }
+      }
+    },
+    "binary_sensor": {
+      "moving": {
+        "name": "Auto liikkeellä"
+      },
+      "doors": {
+        "name": "Ovet"
+      },
+      "door_trunk": {
+        "name": "Takaluukku"
+      },
+      "door_driver": {
+        "name": "Kuljettajan ovi"
+      },
+      "door_passenger": {
+        "name": "Matkustajan ovi"
+      },
+      "door_rear_left": {
+        "name": "Vasen takaovi"
+      },
+      "door_rear_right": {
+        "name": "Oikea takaovi"
+      },
+      "belt_driver": {
+        "name": "Kuskin turvavyö"
+      },
+      "belt_passenger": {
+        "name": "Matkustajan turvavyö"
+      },
+      "battery_plugged": {
+        "name": "Lataus kytketty"
+      },
+      "battery_charging": {
+        "name": "Latauksessa"
+      },
+      "engine": {
+        "name": "Auto käynnissä"
+      },
+      "preconditioning": {
+        "name": "Esi-ilmastointi"
+      },
+      "alarm": {
+        "name": "Hälytys"
+      },
+      "privacy": {
+        "name": "Yksityisyys"
+      },
+      "remote_commands": {
+        "name": "Etäohjaus"
+      },
+      "daylight": {
+        "name": "Päivänvalo"
+      }
+    },
+    "button": {
+      "wakeup": {
+        "name": "Herätys"
+      },
+      "doors_lock": {
+        "name": "Lukitse ovet"
+      },
+      "doors_unlock": {
+        "name": "Avaa ovien lukitus"
+      },
+      "horn": {
+        "name": "Äänimerkki"
+      },
+      "lights": {
+        "name": "Valot"
+      },
+      "charge_start": {
+        "name": "Käynnistä lataus"
+      },
+      "charge_stop": {
+        "name": "Lopeta lataus"
+      },
+      "preconditioning_start": {
+        "name": "Käynnistä esi-ilmastointi"
+      },
+      "preconditioning_stop": {
+        "name": "Lopeta esi-ilmastointi"
+      }
+    },
+    "device_tracker": {
+      "vehicle": {
+        "name": "Auton sijainti"
+      }
+    },
+    "number": {
+      "battery_charging_limit": {
+        "name": "Latauksen rajoitus"
+      },
+      "refresh_interval": {
+        "name": "Päivitysväli"
+      }
+    },
+    "switch": {
+      "battery_charging_limit": {
+        "name": "Latauksen rajoitus päälle"
+      },
+      "abrp_sync": {
+        "name": "ABRP-synkronointi"
+      },
+      "battery_values_correction": {
+        "name": "Akun varaustason arvojen kompensointi"
+      }
+    },
+    "text": {
+      "abrp_token": {
+        "name": "ABRP-tunnus"
+      }
+    },
+    "time": {
+      "battery_charging_start": {
+        "name": "Lataus alkaa"
+      }
+    }
+  },
+  "common": {
+    "access_token_error_title": "Tunnistusvirhe",
+    "access_token_error_message": "Tarkista ohjeistus [OAuth2 Code]({oauth_token_doc_link}) osiosta",
+    "otp_error_title": "OTP-virhe",
+    "otp_error_message": "Tarkista ohjeistus [OTP error - NOK:MAXNBTOOLS]({otp_nokmaxnbtools_doc_link}) osiosta",
+    "no_vehicles_found_title": "Ajoneuvo ei saatavissa",
+    "no_vehicles_found_message": "Tilissä ei ole yhdistettyjä ajoneuvoja",
+    "command_error_title": "Käsky",
+    "command_error_message": "Käskyn lähetyksessä virhe"
+  },
+  "selector": {
+    "reconfigure": {
+      "options": {
+        "oauth": "Todenna tilisi uudelleen",
+        "remote_commands": "Määritä etäkomennot (E-remote tai Connect Plus vaaditaan)",
+        "options": "Globaalit asetukset"
+      }
+    }
+  }
+}

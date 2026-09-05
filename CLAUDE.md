@@ -87,6 +87,14 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
   komprimiert). Paket-Sichtbarkeit ist eine eigene Einstellung je Paket:
   `https://github.com/users/taubenhorst/packages/container/<paket>/settings` → Change visibility.
 
+## Mehrsprachigkeit
+- Alle 14 Upstream-Übersetzungen sind vendored; der Shim-Loader (`hass_shim/.../translation.py`) legt
+  die gewählte Sprache über die englische Basis (fehlende Schlüssel → Englisch, nicht → Schlüsselname),
+  kennt Aliase (`cs`→`cz`, `nb-NO`, `pt-BR`) und Regionalcodes (`fr-FR`→`fr`). `config.yaml` bietet alle 14 an.
+- Der Chromium-Login nutzt das Locale der App-Konfiguration (`stellantis.get_config("locale")`, z. B. `de-DE`).
+- Eigene UI-Texte (`web/server.py`, `web/setup.py`) sind weiterhin nur de/en; andere Sprachen sehen Englisch.
+- Test: `tests/smoke_i18n.py`.
+
 ## Stand
 Schritte 1–5 umgesetzt: Bridge, UI, Runtime, lokaler Build, CI-Build für beide Architekturen, Review-Fixes.
 Echter Login + Statusabruf des e-Rifters verifiziert. Repo/Pakete public. Offen: Installation auf dem Pi.
