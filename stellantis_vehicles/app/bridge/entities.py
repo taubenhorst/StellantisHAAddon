@@ -496,6 +496,14 @@ class DeviceTracker(Entity):
     component = "device_tracker"
     has_state = False
 
+    def __init__(self, coordinator, key, icon=None, **discovery) -> None:
+        super().__init__(coordinator, key, icon, **discovery)
+        # Without a www folder the upstream client keeps the manufacturer's
+        # absolute picture URL - exactly what HA's entity_picture accepts.
+        picture = str(coordinator.vehicle.get("picture") or "")
+        if picture.startswith("http"):
+            self.discovery["entity_picture"] = picture
+
     @property
     def _last_position(self) -> dict:
         last_position = self.data.get("lastPosition")

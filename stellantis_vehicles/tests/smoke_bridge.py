@@ -138,7 +138,8 @@ async def main():
     stellantis = FakeStellantis(hass)
     stellantis.set_entry(hass.config_entries.entry)
     stellantis.save_config({"mobile_app": "MyPeugeot", "country_code": "DE"})
-    vehicle = {"vin": VIN, "vehicle_id": "veh1", "type": "Electric"}
+    vehicle = {"vin": VIN, "vehicle_id": "veh1", "type": "Electric",
+               "picture": "https://visuel3d-secure.peugeot.com/V3DImage.ashx?view=001"}
     stellantis._vehicles = [vehicle]
 
     coordinator = await stellantis.async_get_coordinator(vehicle)
@@ -160,6 +161,8 @@ async def main():
     check(battery_cfg["name"] == "Batterie", f"translated name: {battery_cfg['name']}")
     check(battery_cfg["device"]["manufacturer"] == "MyPeugeot", "device manufacturer from config")
     check(battery_cfg["unit_of_measurement"] == "%" and battery_cfg["device_class"] == "battery", "sensor discovery fields")
+    tracker_cfg = configs[f"homeassistant/device_tracker/stellantis_{VIN}/vehicle/config"]
+    check(tracker_cfg.get("entity_picture", "").startswith("https://visuel3d"), "tracker entity_picture from vehicle picture URL")
     time_cfg = configs[f"homeassistant/text/stellantis_{VIN}/battery_charging_start/config"]
     check(time_cfg["name"] == "Start des Batterieladevorgangs" and "pattern" in time_cfg, "time -> text entity")
     check(len(recorder.subscribed) == len(binding.by_command_topic) and recorder.subscribed, f"{len(recorder.subscribed)} command topics subscribed")
