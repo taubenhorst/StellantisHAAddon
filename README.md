@@ -43,7 +43,8 @@ Lokaler Image-Build: siehe `build.yaml`; CI baut aarch64 und amd64 nach GHCR.
 
 ## Status
 
-Skelett — siehe `stellantis_vehicles/CHANGELOG.md`.
+Funktionsfähig (Login, OTP, Statusabruf, MQTT-Discovery), Images werden per CI nach GHCR gebaut —
+siehe `stellantis_vehicles/CHANGELOG.md`. Noch nicht auf einem Pi im Dauerbetrieb getestet.
 
 ## Lizenz
 

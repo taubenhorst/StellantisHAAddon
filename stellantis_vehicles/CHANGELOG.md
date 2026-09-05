@@ -23,4 +23,6 @@ Skelett — noch nicht lauffähig als Add-on.
 - Echter Login und Statusabruf verifiziert; Fahrzeugbild als `entity_picture`
 - Docker-Image lokal gebaut und gestartet (amd64, 1,9 GB); `.dockerignore`
 
-Offen: CI-Build/GHCR, Installation auf dem Pi.
+- CI baut amd64 und aarch64 nach GHCR
+
+Offen: Installation auf dem Pi.

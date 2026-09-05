@@ -76,16 +76,27 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
   Chromium-Check per `docker run --rm --entrypoint python3 … /data/chromium_check.py`.
 - `.dockerignore` hält `data/` (Tokens, OTP-Pickle) und `tests/` aus dem Build-Kontext.
 
+## CI / GHCR (Schritt 5, 05.09.2026)
+- Repo `taubenhorst/StellantisHAAddon`, `origin` gesetzt, GitHub-CLI (`C:\Program Files\GitHub CLI\gh.exe`)
+  ist als `taubenhorst` angemeldet (Scopes repo/workflow, **kein** read:packages → Paketliste per API geht nicht;
+  Sichtbarkeit stattdessen per anonymem `docker manifest inspect ghcr.io/taubenhorst/stellantis-vehicles-<arch>:0.1.0` prüfen).
+- Erster Workflow-Lauf (Run 33984930360) grün: amd64 2 min, aarch64 7 min. Images:
+  `ghcr.io/taubenhorst/stellantis-vehicles-{amd64,aarch64}:0.1.0` (+ `latest`).
+- Repo und Pakete sind **privat** → Supervisor kann weder das Add-on-Repo klonen noch pullen.
+  Beides muss der Besitzer im GitHub-Web auf „public" stellen (Repo: Settings → General → Danger Zone;
+  Pakete: Profil → Packages → Paket → Package settings → Change visibility).
+
 ## Stand
-Schritte 1–4 umgesetzt: offline getestet, echter Login + Statusabruf des e-Rifters verifiziert,
-Image lokal gebaut und gestartet. Offen: CI-Build/GHCR und Installation auf dem Pi.
+Schritte 1–5 umgesetzt: Bridge, UI, Runtime, lokaler Build, CI-Build für beide Architekturen.
+Echter Login + Statusabruf des e-Rifters verifiziert. Offen: Sichtbarkeit public, Installation auf dem Pi.
 
 ## Nächste Schritte
-5. GitHub-Repo `taubenhorst/StellantisHAAddon` anlegen, pushen, Workflow-Lauf prüfen; GHCR-Pakete auf
-   „public" stellen, sonst kann der Supervisor nicht pullen. aarch64-Build nur in der CI möglich.
-6. Auf dem Pi installieren; dort die HACS-Integration `stellantis_vehicles` deaktivieren (doppeltes Polling,
-   OTP-Gerätelimit). Erster Lauf mit Supervisor-MQTT prüfen (`services: mqtt:want`).
-7. Optional Image verkleinern (`playwright install chromium --no-shell` spart ~150 MB, dann greift der
+6. Repo + GHCR-Pakete public stellen, dann auf dem Pi: Add-on-Store → Repositories →
+   `https://github.com/taubenhorst/StellantisHAAddon` → installieren, Optionen setzen, Ingress-Login.
+   Vorher die HACS-Integration `stellantis_vehicles` deaktivieren (doppeltes Polling, OTP-Gerätelimit).
+   Erster Lauf mit Supervisor-MQTT prüfen (`services: mqtt:want`, `run`-Skript setzt `STELLANTIS_MQTT_*`).
+7. Neue Version = `version:` in `config.yaml` anheben + Tag `vX.Y.Z` pushen (Workflow baut auch bei Tags).
+8. Optional Image verkleinern (`playwright install chromium --no-shell` spart ~150 MB, dann greift der
    Fallback in `_launch` nicht mehr).
 
 ## Lokal starten
