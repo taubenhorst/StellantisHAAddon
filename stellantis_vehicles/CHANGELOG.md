@@ -1,3 +1,14 @@
+## 0.1.1
+
+- All 14 upstream translations with per-key English fallback; `language` option offers all of them
+- Browser login uses the locale of the account's country instead of a fixed `de-DE`
+- Retained offline status is delivered before a clean disconnect (entities go unavailable when the add-on stops)
+- Number commands are clamped to their min/max; charge limit and refresh interval cannot be set out of range via MQTT
+- Entities are rebuilt when remote commands are switched on or off; option `remote_commands: false` wins at start
+- Inconsistent stored last-charge data is dropped instead of freezing the sensor
+- No empty notification on a failed browser login; login-required hint stays while a vehicle still fails
+- README/DOCS: unofficial community project and trademark notice; vehicle picture as `entity_picture`
+
 ## 0.1.0
 
 First working version.
@@ -23,6 +34,5 @@ First working version.
 - Real login and status retrieval verified; vehicle picture as `entity_picture`
 - Docker image built and started locally (amd64, 1.9 GB); `.dockerignore`
 - CI builds amd64 and aarch64 images to GHCR
-- All 14 upstream translations, per-key English fallback, browser locale from the app configuration
 
 Open: installation on the Pi.
