@@ -83,16 +83,16 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
   Sichtbarkeit stattdessen per anonymem `docker manifest inspect ghcr.io/taubenhorst/stellantis-vehicles-<arch>:0.1.0` prüfen).
 - Erster Workflow-Lauf (Run 33984930360) grün: amd64 2 min, aarch64 7 min. Images:
   `ghcr.io/taubenhorst/stellantis-vehicles-{amd64,aarch64}:0.1.0` (+ `latest`).
-- Repo und Pakete sind **privat** → Supervisor kann weder das Add-on-Repo klonen noch pullen.
-  Beides muss der Besitzer im GitHub-Web auf „public" stellen (Repo: Settings → General → Danger Zone;
-  Pakete: Profil → Packages → Paket → Package settings → Change visibility).
+- Repo und beide Pakete sind seit 05.09.2026 **public** (anonymer Manifest-Zugriff verifiziert, ~540/573 MB
+  komprimiert). Paket-Sichtbarkeit ist eine eigene Einstellung je Paket:
+  `https://github.com/users/taubenhorst/packages/container/<paket>/settings` → Change visibility.
 
 ## Stand
-Schritte 1–5 umgesetzt: Bridge, UI, Runtime, lokaler Build, CI-Build für beide Architekturen.
-Echter Login + Statusabruf des e-Rifters verifiziert. Offen: Sichtbarkeit public, Installation auf dem Pi.
+Schritte 1–5 umgesetzt: Bridge, UI, Runtime, lokaler Build, CI-Build für beide Architekturen, Review-Fixes.
+Echter Login + Statusabruf des e-Rifters verifiziert. Repo/Pakete public. Offen: Installation auf dem Pi.
 
 ## Nächste Schritte
-6. Repo + GHCR-Pakete public stellen, dann auf dem Pi: Add-on-Store → Repositories →
+6. Auf dem Pi: Add-on-Store → Repositories →
    `https://github.com/taubenhorst/StellantisHAAddon` → installieren, Optionen setzen, Ingress-Login.
    Vorher die HACS-Integration `stellantis_vehicles` deaktivieren (doppeltes Polling, OTP-Gerätelimit).
    Erster Lauf mit Supervisor-MQTT prüfen (`services: mqtt:want`, `run`-Skript setzt `STELLANTIS_MQTT_*`).
