@@ -10,6 +10,14 @@ Supported brands are the ones the upstream integration supports: Peugeot, Citro�
 Opel and Vauxhall (the former PSA apps). Fiat, Jeep, Alfa Romeo and the other FCA brands
 use a different backend and are not covered.
 
+## Disclaimer
+
+This is an unofficial community project. It is not affiliated with, endorsed by or
+supported by Stellantis or any of its brands, and it uses the same non-public vehicle
+APIs as the upstream integration, which may change or stop working at any time.
+Stellantis, Peugeot, Citroën, DS, Opel, Vauxhall and all other brand names and logos
+mentioned here are trademarks of Stellantis N.V. and its subsidiaries. Use at your own risk.
+
 ## Installation
 
 Settings → Add-ons → Add-on Store → ⋮ → Repositories →

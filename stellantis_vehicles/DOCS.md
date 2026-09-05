@@ -1,5 +1,8 @@
 # Stellantis Vehicles
 
+Unofficial community project, not affiliated with or endorsed by Stellantis. All brand
+names are trademarks of Stellantis N.V. and its subsidiaries.
+
 ## Setup
 
 1. Install the Mosquitto broker add-on and set up the MQTT integration in Home Assistant.
