@@ -34,6 +34,17 @@ class UnitOfVolume(StrEnum):
     GALLONS = "gal"
 
 
+class UnitOfPower(StrEnum):
+    WATT = "W"
+    KILO_WATT = "kW"
+
+
+class UnitOfTime(StrEnum):
+    SECONDS = "s"
+    MINUTES = "min"
+    HOURS = "h"
+
+
 class EntityCategory(StrEnum):
     CONFIG = "config"
     DIAGNOSTIC = "diagnostic"

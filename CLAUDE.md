@@ -15,20 +15,35 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
 
 ## Weitere Doku
 - `docs/PLANUNG.md`: vollständiges Planungsprotokoll mit Analyse, Entscheidungen, Risiken
+- `stellantis_vehicles/DOCS.md`: Nutzerdoku inkl. MQTT-Topic-Schema
+
+## Aufbau der Bridge (Schritt 1, fertig)
+- `app/stellantis_vehicles/base.py`: Port des Upstream-Coordinators (Polling, updatedAt-Vergleich,
+  Leerantworten, Command-History, send_*-Kommandos, Ladelimit, ABRP, letzte Fahrt). Kein HA.
+  `_sensors` ist der gemeinsame Zustand mit der Bridge — gleiche Ein-Zyklus-Verzögerung wie Upstream.
+- `app/bridge/entities.py`: Ersatz für die Upstream-Plattformdateien. Jede Entity kennt Discovery-
+  Felder, `update()` (Wert aus `coordinator.data`, schreibt `_sensors`) und `handle_command()`.
+  Reihenfolge = Upstream-PLATFORMS (binary_sensor vor sensor!), sonst hinkt `last_charge` nach.
+- `app/bridge/mqtt_bridge.py`: paho-Client, Discovery pro Entity, State/Attribute/Availability,
+  Command-Dispatch (seriell). paho-Callbacks laufen im Netzwerk-Thread → `run_coroutine_threadsafe`.
+- Abweichungen zu Upstream, durch MQTT erzwungen: keine `time`-Plattform → `battery_charging_start`
+  ist ein `text` mit `HH:MM`; number/switch/text/last_charge persistieren in der Stored Config
+  (`/data/config_entry.json`, Knoten `vehicles.<vin>`); Topics/unique_ids enthalten die Komponente,
+  weil `battery_charging_limit` als number *und* switch existiert. `default_entity_id` braucht HA ≥ 2025.10.
+- Offline-Test: `cd stellantis_vehicles && ../.venv/Scripts/python tests/smoke_bridge.py`
+  (Fake-Client + Recorder statt paho, 52 Checks). Vor jeder Änderung an Bridge/Coordinator laufen lassen.
 
 ## Stand
-Skelett, siehe `stellantis_vehicles/CHANGELOG.md`. Import-Smoke-Test des Upstream-Clients
-über den Shim läuft; Docker-Build und CI noch ungetestet.
+Schritt 1 (Discovery-Mapping) umgesetzt und offline getestet. Docker-Build und CI ungetestet.
+Bekannte Lücke: `entity_picture` des Fahrzeugs wird nicht gesetzt (HA verlangt absolute URL).
 
 ## Nächste Schritte
-1. `app/bridge/mqtt_bridge.py`: Discovery-Mapping aus den Upstream-Plattformdateien
-   (sensor.py, binary_sensor.py, button.py, number.py, switch.py, text.py, time.py,
-   device_tracker.py im Upstream-Repo) — Entity-Beschreibungen → Discovery-Payloads,
-   Status → State-Topics, Command-Topics → `StellantisVehicles`-Aufrufe.
 2. `app/web/server.py`: Login-Flow (browser/manual), SMS-Code + PIN für OTP,
    Statusseite mit `hass.notifications`.
-3. `app/main.py`: Wiring gemäß TODO-Kommentar (get_user_vehicles → Coordinators →
-   scheduled_tokens_refresh → connect_mqtt).
+3. `app/main.py`: Wiring — Stored Config aus `hass.config_entries.entry.data` in `stellantis.save_config`,
+   `get_user_vehicles` → `async_get_coordinator` → `bridge.attach` → `coordinator.start()`,
+   `scheduled_tokens_refresh`, `connect_mqtt`; `coordinator.on_auth_failed` an die UI hängen;
+   MQTT-Zugang aus `STELLANTIS_MQTT_*` (setzt `rootfs/.../run`) lesen, nicht nur aus `options.mqtt`.
 4. Docker-Build lokal, dann CI.
 
 ## Lokal starten

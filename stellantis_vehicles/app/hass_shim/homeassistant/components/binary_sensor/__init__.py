@@ -3,6 +3,7 @@ from enum import StrEnum
 
 class BinarySensorDeviceClass(StrEnum):
     BATTERY_CHARGING = "battery_charging"
+    CONNECTIVITY = "connectivity"
     DOOR = "door"
     LIGHT = "light"
     LOCK = "lock"
