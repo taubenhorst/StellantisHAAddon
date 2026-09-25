@@ -7,10 +7,12 @@ and paho is replaced by a recorder. Run from the add-on directory:
     .venv/bin/python tests/smoke_bridge.py            (Linux)
 """
 import asyncio
+import copy
 import json
 import os
 import sys
 import tempfile
+from datetime import timedelta
 
 APP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app")
 sys.path.insert(0, os.path.join(APP_DIR, "hass_shim"))
@@ -18,7 +20,9 @@ sys.path.insert(0, APP_DIR)
 
 from homeassistant.core import HomeAssistant  # noqa: E402
 
+from stellantis_vehicles.const import COMMAND_HISTORY_LIMIT, PENDING_ACTION_TIMEOUT  # noqa: E402
 from stellantis_vehicles.stellantis import StellantisVehicles  # noqa: E402
+from stellantis_vehicles.utils import get_datetime  # noqa: E402
 from bridge.mqtt_bridge import MqttBridge  # noqa: E402
 
 VIN = "VR3TESTVIN0000001"
@@ -76,9 +80,19 @@ class FakeStellantis(StellantisVehicles):
         self._mqtt = FakeUpstreamMqtt()
         self.sent = []
         self.status = STATUS
+        self.maintenance = {"mileageBeforeMaintenance": 15000, "daysBeforeMaintenance": 200,
+                            "updatedAt": "2026-09-05T09:00:00Z"}
+        self.maintenance_error = None
+        self.maintenance_calls = 0
 
     async def get_vehicle_status(self, vehicle):
-        return self.status
+        return copy.deepcopy(self.status)
+
+    async def get_vehicle_maintenance(self, vehicle):
+        self.maintenance_calls += 1
+        if self.maintenance_error:
+            raise self.maintenance_error
+        return self.maintenance
 
     async def get_user_vehicles(self, force=False):
         return self._vehicles
@@ -196,6 +210,7 @@ async def main():
     check(av("charge_start") == "offline" and av("charge_stop") == "online", "charge buttons availability while charging")
     check(av("preconditioning_start") == "online", "preconditioning available (locked, charging)")
     check(av("switch/battery_charging_limit") == "offline", "charge-limit switch unavailable without limit")
+    check(s("mileage_before_maintenance") == "15000" and s("days_before_maintenance") == "200", "maintenance sensors")
 
     print("commands")
     await bridge._dispatch_command(f"stellantis/{VIN}/number/battery_charging_limit/set", "150")
@@ -212,18 +227,42 @@ async def main():
     check(stellantis.sent[-1] == ("/Doors", {"action": "lock"}), f"doors lock sent: {stellantis.sent[-1]}")
     check(s("command_status") == "Türen verriegeln: " or s("command_status").startswith("Türen verriegeln") or s("command_status") in ("None", None), f"command_status {s('command_status')!r}")
     check(av("horn") == "offline", "buttons unavailable while action pending")
+    entry = coordinator._commands_history["action1"]
+    check(entry["service"] == "/Doors" and entry["message"] == {"action": "lock"} and entry["retried"] is False
+          and entry["sent_at"] is not None, "history entry keeps service/message for the MQTT 400 retry")
+    n_sent = len(stellantis.sent)
+    coordinator._pending_action_id = "action1"  # the horn button is unavailable, send directly
+    try:
+        await coordinator.send_horn_command("Hupe")
+        rejected = None
+    except Exception as err:  # noqa: BLE001
+        rejected = err
+    check(type(rejected).__name__ == "ServiceValidationError" and "Türen verriegeln" in str(rejected)
+          and len(stellantis.sent) == n_sent, f"second command rejected while pending: {rejected}")
+    await coordinator.update_command_history("action1", "900")
+    check(coordinator.pending_action, "still pending after an in-progress status (900)")
     await coordinator.update_command_history("action1", "0")
+    check(not coordinator.pending_action, "final status clears pending")
     check(s("command_status").endswith("Abgeschlossen") or "0" in s("command_status") or s("command_status"), f"command_status after result: {s('command_status')!r}")
     check(av("horn") == "online", "buttons available again")
     await bridge._dispatch_command(f"stellantis/{VIN}/text/battery_charging_start/set", "06:15")
     check(stellantis.sent[-1][0] == "/VehCharge" and stellantis.sent[-1][1]["program"] == {"hour": 6, "minute": 15}, f"charge time sent: {stellantis.sent[-1]}")
+    # No answer from the vehicle: the pending command stops blocking after the timeout
+    coordinator._commands_history["action2"]["sent_at"] -= timedelta(seconds=PENDING_ACTION_TIMEOUT + 1)
+    check(not coordinator.pending_action, "pending command times out without answer")
     await bridge._dispatch_command(f"stellantis/{VIN}/button/preconditioning_start/set", "PRESS")
     check(stellantis.sent[-1][1]["programs"]["program1"] == {"day": [1, 0, 0, 0, 1, 0, 0], "hour": 7, "minute": 30, "on": 1}, f"precond programs: {stellantis.sent[-1][1]['programs']['program1']}")
+    await coordinator.update_command_history("action3", "0")
     await bridge._dispatch_command(f"stellantis/{VIN}/button/wakeup/set", "PRESS")
     check(stellantis.sent[-1] == ("/VehCharge/state", {"action": "state"}), "wakeup sent")
+    await coordinator.update_command_history("action4", "0")
+    for i in range(COMMAND_HISTORY_LIMIT + 5):
+        coordinator._commands_history[f"old{i}"] = {"name": "x", "updates": [], "sent_at": get_datetime()}
+    coordinator._prune_command_history()
+    check(len(coordinator._commands_history) == COMMAND_HISTORY_LIMIT and "action1" not in coordinator._commands_history,
+          "command history bounded, oldest dropped")
 
     print("charge end + last trip")
-    import copy
     ended = copy.deepcopy(STATUS)
     ended["updatedAt"] = "2026-09-05T12:00:00Z"
     ended["energies"][0]["level"] = 80
@@ -266,6 +305,22 @@ async def main():
     lc = a("last_charge")
     check(lc.get("in_progress") is True and lc.get("initial_percentage") == "67 %" and s("last_charge") != "None",
           f"stale in_progress dropped, new charge start detected: {lc}")
+
+    print("maintenance endpoint")
+    stellantis.maintenance_error = RuntimeError("maintenance down")
+    stellantis.status["updatedAt"] = "2026-09-05T15:00:00Z"
+    await coordinator.async_refresh()
+    check(recorder.published[f"stellantis/{VIN}/available"] == "online" and s("mileage_before_maintenance") == "15000",
+          "maintenance error keeps the poll ok and the last values")
+    stellantis.maintenance_error = None
+    stellantis.maintenance = {}
+    stellantis.status["updatedAt"] = "2026-09-05T16:00:00Z"
+    await coordinator.async_refresh()
+    calls = stellantis.maintenance_calls
+    stellantis.status["updatedAt"] = "2026-09-05T17:00:00Z"
+    await coordinator.async_refresh()
+    check(coordinator._maintenance_unsupported and stellantis.maintenance_calls == calls,
+          "empty maintenance answer stops further maintenance polling")
 
     print("remote commands toggled")
     n_before = len(binding.entities)

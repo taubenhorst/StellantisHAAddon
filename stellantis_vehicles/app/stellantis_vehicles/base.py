@@ -1,9 +1,11 @@
 """Own replacement for the upstream DataUpdateCoordinator.
 
-Port of the coordinator half of the upstream ``base.py`` (commit 69fddda)
-without anything Home-Assistant-specific. stellantis.py imports
+Port of the coordinator half of the upstream ``base.py`` (commit da32364,
+first ported from 69fddda) without anything Home-Assistant-specific. stellantis.py imports
 ``StellantisVehicleCoordinator`` from here and touches:
-  - coordinator._vehicle / coordinator._commands_history
+  - coordinator._vehicle / coordinator._commands_history (per action_id:
+    name, updates, service, message, retried, sent_at - the MQTT 400 retry
+    resends the entry's own service/message)
   - coordinator.async_refresh()
   - coordinator.update_command_history(correlation_id, result_code)
 
@@ -20,18 +22,24 @@ from datetime import UTC, datetime, timedelta
 from typing import Awaitable, Callable
 
 from homeassistant.components import persistent_notification
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
+from homeassistant.helpers import translation
 
 from .const import (
+    COMMAND_HISTORY_LIMIT,
+    COMMAND_STATUS_STILL_IN_PROGRESS,
     DOMAIN,
     EMPTY_STATUS_LIMIT,
+    PENDING_ACTION_TIMEOUT,
     UPDATE_INTERVAL,
     VEHICLE_TYPE_ELECTRIC,
     VEHICLE_TYPE_HYBRID,
 )
-from .utils import get_datetime, rate_limit, time_from_pt_string
+from .utils import SENSITIVE_DATA_FILTER, get_datetime, log_call, rate_limit, time_from_pt_string
 
 _LOGGER = logging.getLogger(__name__)
+# Shared filter instance, attached once at import (upstream issue #414).
+_LOGGER.addFilter(SENSITIVE_DATA_FILTER)
 
 Listener = Callable[["StellantisVehicleCoordinator"], Awaitable[None] | None]
 
@@ -52,12 +60,18 @@ class StellantisVehicleCoordinator:
         self._sensors: dict = {}
         self._commands_history: dict = {}
         self._disabled_commands: list[str] = []
+        # action_id of the command currently blocking further remote commands,
+        # or None; cleared once that command reaches a final status.
+        self._pending_action_id: str | None = None
         self._last_trip = None
         self._manage_charge_limit_sent = False
         self._phase_offset = 0
         self._privacy_full_logged = False
         self._empty_status_count = 0
         self._vehicle_removed = False
+        # Set once the maintenance endpoint returned nothing, so it is not
+        # polled again for this coordinator (upstream issue #623).
+        self._maintenance_unsupported = False
 
         self._listeners: list[Listener] = []
         self._task: asyncio.Task | None = None
@@ -65,9 +79,6 @@ class StellantisVehicleCoordinator:
         # Called once when polling stops because the token is dead
         # (upstream: config_entry.async_start_reauth). Set by main.py.
         self.on_auth_failed: Callable[[], None] | None = None
-
-        if self._stellantis.logger_filter:
-            _LOGGER.addFilter(self._stellantis.logger_filter)
 
     # --- public API used by the bridge -------------------------------------
     @property
@@ -181,9 +192,9 @@ class StellantisVehicleCoordinator:
             self.last_update_success = True
             await self._notify()
 
+    @log_call
     async def _async_update_data(self) -> None:
         """Update vehicle data from Stellantis (upstream logic, minus UpdateFailed)."""
-        _LOGGER.debug("---------- START _async_update_data")
         new_data = await self._stellantis.get_vehicle_status(self._vehicle)
 
         if not new_data:
@@ -193,36 +204,67 @@ class StellantisVehicleCoordinator:
             _LOGGER.debug("Empty vehicle status response (%s in a row), keeping last known data",
                           self._empty_status_count)
             if self._empty_status_count < EMPTY_STATUS_LIMIT:
-                _LOGGER.debug("---------- END _async_update_data")
                 return
             if self._empty_status_count % EMPTY_STATUS_LIMIT == 0 and not self._vehicle_removed:
                 await self._reconcile_vehicle()
-            _LOGGER.debug("---------- END _async_update_data")
             raise RuntimeError("Empty vehicle status response")
 
+        await self._add_maintenance(new_data)
         self._empty_status_count = 0
         self._clear_vehicle_removed()
         self._log_privacy_mode(new_data.get("privacy", {}).get("state"))
 
-        if "updatedAt" in new_data and "updatedAt" in self._data:
-            try:
-                current_dt = datetime.fromisoformat(self._data["updatedAt"])
-                new_dt = datetime.fromisoformat(new_data["updatedAt"])
-                if current_dt.tzinfo is None:
-                    current_dt = current_dt.replace(tzinfo=UTC)
-                if new_dt.tzinfo is None:
-                    new_dt = new_dt.replace(tzinfo=UTC)
-            except (ValueError, TypeError):
-                _LOGGER.debug("Invalid updatedAt values, proceeding without timestamp comparison")
-            else:
-                if new_dt <= current_dt:
-                    _LOGGER.debug("API did not return updated vehicle data, skipping sensor update")
-                    _LOGGER.debug("---------- END _async_update_data")
-                    return
+        if self._is_stale(new_data):
+            return
 
         self._data = new_data
         await self.after_async_update_data()
-        _LOGGER.debug("---------- END _async_update_data")
+
+    async def _add_maintenance(self, new_data: dict) -> None:
+        """Merge the maintenance endpoint into the status (upstream ``_fetch_new_data``).
+
+        Deviation from upstream: an error on this optional endpoint keeps the
+        last known maintenance values instead of failing the whole update.
+        """
+        if self._maintenance_unsupported:
+            return
+        try:
+            maintenance = await self._stellantis.get_vehicle_maintenance(self._vehicle)
+        except ConfigEntryAuthFailed:
+            raise
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Could not fetch maintenance data for %s: %s", self.vin, err)
+            if "maintenance" in self._data:
+                new_data["maintenance"] = self._data["maintenance"]
+            return
+        if maintenance:
+            new_data["maintenance"] = {
+                "mileageBeforeMaintenance": maintenance.get("mileageBeforeMaintenance"),
+                "daysBeforeMaintenance": maintenance.get("daysBeforeMaintenance"),
+                "updatedAt": maintenance.get("updatedAt"),
+            }
+        else:
+            _LOGGER.debug("Vehicle maintenance data not found - disabling further maintenance polling")
+            self._maintenance_unsupported = True
+
+    def _is_stale(self, new_data: dict) -> bool:
+        """Whether new_data's updatedAt is not newer than the data already held."""
+        if "updatedAt" not in new_data or "updatedAt" not in self._data:
+            return False
+        try:
+            current_dt = datetime.fromisoformat(self._data["updatedAt"])
+            new_dt = datetime.fromisoformat(new_data["updatedAt"])
+        except (ValueError, TypeError):
+            _LOGGER.debug("Invalid updatedAt values, proceeding without timestamp comparison")
+            return False
+        if current_dt.tzinfo is None:
+            current_dt = current_dt.replace(tzinfo=UTC)
+        if new_dt.tzinfo is None:
+            new_dt = new_dt.replace(tzinfo=UTC)
+        if new_dt <= current_dt:
+            _LOGGER.debug("API did not return updated vehicle data, skipping sensor update")
+            return True
+        return False
 
     def _log_privacy_mode(self, state) -> None:
         active = state == "Full"
@@ -289,10 +331,21 @@ class StellantisVehicleCoordinator:
 
     @property
     def pending_action(self) -> bool:
-        if not self._commands_history:
+        """A sent command without final status blocks further commands, but
+        only for PENDING_ACTION_TIMEOUT seconds after its last activity."""
+        if self._pending_action_id is None:
             return False
-        last_action_id = list(self._commands_history.keys())[-1]
-        return not self._commands_history[last_action_id]["updates"]
+        pending_command = self._commands_history.get(self._pending_action_id)
+        if not pending_command:
+            return False
+        last_activity_at = pending_command["updates"][-1]["date"] if pending_command["updates"] else pending_command["sent_at"]
+        return (get_datetime() - last_activity_at).total_seconds() < PENDING_ACTION_TIMEOUT
+
+    def _prune_command_history(self) -> None:
+        """Drop the oldest entries beyond COMMAND_HISTORY_LIMIT."""
+        excess = len(self._commands_history) - COMMAND_HISTORY_LIMIT
+        for _ in range(max(0, excess)):
+            del self._commands_history[next(iter(self._commands_history))]
 
     async def update_command_history(self, action_id, update=None) -> None:
         if action_id not in self._commands_history:
@@ -300,7 +353,11 @@ class StellantisVehicleCoordinator:
         if update:
             self._commands_history[action_id]["updates"].append({"info": update, "date": get_datetime()})
             if update == "not_compatible":
-                self._disabled_commands.append(self._commands_history[action_id]["name"])
+                disabled_name = self._commands_history[action_id]["name"]
+                if disabled_name not in self._disabled_commands:
+                    self._disabled_commands.append(disabled_name)
+            if update not in COMMAND_STATUS_STILL_IN_PROGRESS and self._pending_action_id == action_id:
+                self._pending_action_id = None
         await self._notify()
 
     def update_command_history_rate_limit(self, name) -> None:
@@ -308,14 +365,39 @@ class StellantisVehicleCoordinator:
         self._commands_history.update({
             current_datetime.time(): {"name": name, "updates": [{"info": "rate_limit", "date": current_datetime}]}
         })
+        self._prune_command_history()
         self.async_update_listeners()
 
     # --- commands ------------------------------------------------------------
+    async def _raise_command_pending(self, name) -> None:
+        pending_name = self._commands_history[self._pending_action_id]["name"]
+        placeholders = {"name": name, "pending_name": pending_name}
+        translations = await translation.async_get_translations(
+            self._hass, self._hass.config.language, "exceptions", {DOMAIN})
+        template = translations.get(f"component.{DOMAIN}.exceptions.command_already_pending.message",
+                                    'Cannot send "{name}": "{pending_name}" is still waiting for a response from the vehicle.')
+        raise ServiceValidationError(
+            template.format(**placeholders),
+            translation_domain=DOMAIN,
+            translation_key="command_already_pending",
+            translation_placeholders=placeholders,
+        )
+
     async def send_command(self, name, service, message) -> None:
+        if self.pending_action:
+            await self._raise_command_pending(name)
         try:
             action_id = await self._stellantis.send_mqtt_message(service, message, self._vehicle)
             if action_id is not None:
-                self._commands_history.update({action_id: {"name": name, "updates": []}})
+                # service/message: a 400 "invalid token" answer for this
+                # action_id is retried with its own payload (stellantis.py);
+                # sent_at: pending_action fallback before any update arrived.
+                self._commands_history.update({action_id: {
+                    "name": name, "updates": [], "service": service, "message": message,
+                    "retried": False, "sent_at": get_datetime(),
+                }})
+                self._prune_command_history()
+                self._pending_action_id = action_id
                 await self._notify()
         except ConfigEntryAuthFailed as e:
             _LOGGER.warning("Authentication failed while sending command '%s' to vehicle '%s': %s", name, self.vin, e)
@@ -366,6 +448,8 @@ class StellantisVehicleCoordinator:
             occurence = program.get("occurence")
             if occurence and occurence.get("day") and program.get("start"):
                 date = time_from_pt_string(program["start"])
+                if date is None:
+                    continue
                 default_programs["program" + str(program["slot"])] = {
                     "day": [int(day in occurence["day"]) for day in ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")],
                     "hour": date.hour,
@@ -373,6 +457,10 @@ class StellantisVehicleCoordinator:
                     "on": int(program["enabled"]),
                 }
         return default_programs
+
+    async def send_charge_limit_command(self, button_name, action) -> None:
+        """Native 80 % charge limit: ``daily`` = on, ``trip`` = off."""
+        await self.send_command(button_name, "/VehCharge/limit", {"action": action})
 
     async def send_preconditioning_command(self, button_name, action) -> None:
         await self.send_command(button_name, "/ThermalPrecond", {"asap": action, "programs": self.get_programs()})
@@ -403,6 +491,8 @@ class StellantisVehicleCoordinator:
             tlm["is_charging"] = sensors.get("battery_charging") == "InProgress"
         if sensors.get("battery_charging_type") is not None:
             tlm["is_dcfc"] = tlm["is_charging"] and sensors.get("battery_charging_type") == "Quick"
+        if sensors.get("engine") is not None:
+            tlm["is_parked"] = sensors.get("engine") == "Stop"
         if sensors.get("battery_health_resistance") is not None:
             tlm["soh"] = float(sensors.get("battery_health_resistance"))
         if sensors.get("battery_health_capacity") is not None:
@@ -427,30 +517,61 @@ class StellantisVehicleCoordinator:
         Reads ``_sensors`` as filled by the bridge on the *previous* update,
         exactly like upstream (entities update after the coordinator).
         """
-        sensors = self._sensors
         if self.vehicle_type in [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]:
-            if "battery_charging" in sensors:
-                if sensors.get("battery_charging") == "InProgress" and not self._manage_charge_limit_sent:
-                    charge_limit_on = sensors.get("switch_battery_charging_limit", False)
-                    charge_limit = sensors.get("number_battery_charging_limit", None)
-                    if charge_limit_on and charge_limit and "battery" in sensors:
-                        current_battery = sensors.get("battery")
-                        if current_battery is not None and int(float(current_battery)) >= int(charge_limit):
-                            button_name = self.get_translation("component.stellantis_vehicles.entity.button.charge_stop.name", "charge_stop")
-                            await self.send_charge_command(button_name, False, "delayed")
-                            self._manage_charge_limit_sent = True
-                elif sensors.get("battery_charging") != "InProgress" and self._manage_charge_limit_sent:
-                    self._manage_charge_limit_sent = False
+            await self._auto_stop_charge_at_limit()
+            await self._sync_abrp_if_enabled()
+        await self._fetch_last_trip_on_engine_stop()
 
-            token = sensors.get("text_abrp_token")
-            if sensors.get("switch_abrp_sync") and token and len(token) == 36:
-                await self.send_abrp_data()
+    async def _auto_stop_charge_at_limit(self) -> None:
+        """Send a delayed charge-stop command once the configured limit is reached."""
+        sensors = self._sensors
+        if "battery_charging" not in sensors:
+            return
+        if sensors.get("battery_charging_limit") == "Partial":
+            # The vehicle's native 80 % limit is active, it stops on its own
+            return
+        if sensors.get("battery_charging") != "InProgress":
+            self._manage_charge_limit_sent = False
+            return
+        if self._manage_charge_limit_sent:
+            return
+        charge_limit_on = sensors.get("switch_battery_charging_limit", False)
+        charge_limit = sensors.get("number_battery_charging_limit")
+        current_battery = sensors.get("battery")
+        if not (charge_limit_on and charge_limit and current_battery is not None):
+            return
+        if int(float(current_battery)) < int(charge_limit):
+            return
+        button_name = self.get_translation("component.stellantis_vehicles.entity.button.charge_stop.name", "charge_stop")
+        try:
+            await self.send_charge_command(button_name, False, "delayed")
+        except ServiceValidationError as err:
+            # Another command is still pending; must not fail the poll (upstream
+            # would), the next cycle tries again.
+            _LOGGER.debug("Charge limit stop postponed: %s", err)
+            return
+        self._manage_charge_limit_sent = True
 
-        current_engine_status = sensors.get("engine")
+    async def _sync_abrp_if_enabled(self) -> None:
+        """Push the current status to ABRP if sync is enabled with a valid token."""
+        if not self._sensors.get("switch_abrp_sync"):
+            return
+        token = self._sensors.get("text_abrp_token")
+        if not token or len(token) != 36:
+            return
+        await self.send_abrp_data()
+
+    async def _fetch_last_trip_on_engine_stop(self) -> None:
+        """Fetch the last trip once the engine transitions from running to Stop."""
+        current_engine_status = self._sensors.get("engine")
         new_engine_status = self._data.get("ignition", {}).get("type")
-        if new_engine_status == "Stop" and current_engine_status not in (None, "Stop"):
-            _LOGGER.debug("Engine status changed from %s to %s, fetching last trip data", current_engine_status, new_engine_status)
-            await self.get_vehicle_last_trip()
+        if new_engine_status != "Stop":
+            return
+        if current_engine_status in (None, "Stop"):
+            _LOGGER.debug("No last-trip fetch needed (engine %s -> Stop)", current_engine_status)
+            return
+        _LOGGER.debug("Engine status changed from %s to %s, fetching last trip data", current_engine_status, new_engine_status)
+        await self.get_vehicle_last_trip()
 
     async def get_vehicle_last_trip(self) -> None:
         try:

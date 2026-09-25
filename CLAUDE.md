@@ -22,6 +22,10 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
 - `app/stellantis_vehicles/base.py`: Port des Upstream-Coordinators (Polling, updatedAt-Vergleich,
   Leerantworten, Command-History, send_*-Kommandos, Ladelimit, ABRP, letzte Fahrt). Kein HA.
   `_sensors` ist der gemeinsame Zustand mit der Bridge — gleiche Ein-Zyklus-Verzögerung wie Upstream.
+  Stand Upstream da32364: Wartungsabfrage (Fehler behalten die alten Werte, leere Antwort schaltet sie ab —
+  bewusste Abweichung, Upstream lässt dann das ganze Update scheitern), Befehlssperre solange ein Befehl
+  offen ist (`pending_action`, 60 s Timeout, Ablehnung als `ServiceValidationError`), History-Einträge mit
+  `service`/`message`/`retried`/`sent_at` (braucht der MQTT-400-Retry in stellantis.py), max. 50 Einträge.
 - `app/bridge/entities.py`: Ersatz für die Upstream-Plattformdateien. Jede Entity kennt Discovery-
   Felder, `update()` (Wert aus `coordinator.data`, schreibt `_sensors`) und `handle_command()`.
   Reihenfolge = Upstream-PLATFORMS (binary_sensor vor sensor!), sonst hinkt `last_charge` nach.
