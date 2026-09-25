@@ -1,3 +1,25 @@
+## 0.2.0
+
+Upstream integration updated from 2026.9.1 (69fddda) to develop da32364 (after 2026.9.5-beta.1).
+
+- New entities: maintenance sensors (mileage / days before maintenance), native 80 % charge
+  limit (binary sensor `battery_charging_limit`, buttons `charge_limit_on` / `charge_limit_off`),
+  binary sensor `command_pending`
+- While a command waits for the vehicle's answer (max. 60 s), a second one is rejected and
+  logged; buttons no longer turn unavailable meanwhile
+- Own charge limit (number/switch) is unavailable and does not send a stop command while the
+  vehicle's native limit is active
+- Token handling from upstream: retry once after HTTP 401, OAuth/MQTT token refresh with backoff
+  and timers that survive unexpected errors, reauth started directly by the refresh timers
+- MQTT: connect/disconnect serialized, commands check the connection first, the retry after an
+  "invalid token" answer resends the right command, "vehicle asleep" (901) no longer in the history
+- Logs: sensitive data filter attached once and bounded (upstream #414), also masks OTP PIN,
+  ABRP token, GPS position, e-mail and password
+- Fix: a stale range of 0 from a sleeping car no longer zeroes the battery level
+- Command history limited to 50 entries; device manufacturer from the API brand
+- Slovenian translation (15 languages)
+- Stored config is written by the entry update itself (upstream no longer triggers the save)
+
 ## 0.1.1
 
 - All 14 upstream translations with per-key English fallback; `language` option offers all of them

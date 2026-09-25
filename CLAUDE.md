@@ -132,6 +132,8 @@ selben Repository (eine Store-URL für beides), kein eigenes Repo.
 ## Stand
 Schritte 1–5 umgesetzt: Bridge, UI, Runtime, lokaler Build, CI-Build für beide Architekturen, Review-Fixes.
 Echter Login + Statusabruf des e-Rifters verifiziert. Repo/Pakete public.
+Add-on 0.2.0 (25.09.2026): Upstream auf develop da32364 gehoben (Schritte 1–4: Vendor+Shim, base.py, Bridge,
+Release). Offline-Tests grün, live auf dem Pi noch nicht gelaufen.
 Zweites Add-on `stellantis_login_worker` 0.2.0 (mit Supervisor-Discovery) — HTTP-Vertrag getestet, live noch nicht gelaufen.
 
 ## Nächste Schritte
