@@ -29,6 +29,8 @@ import paho.mqtt.client as mqtt
 
 from stellantis_vehicles.const import FIELD_MOBILE_APP
 
+from homeassistant.exceptions import ServiceValidationError
+
 from .entities import Entity, build_entities
 
 _LOGGER = logging.getLogger(__name__)
@@ -219,7 +221,8 @@ class MqttBridge:
         return {
             "identifiers": [f"stellantis_{vin}"],
             "name": vin,
-            "manufacturer": coordinator.config.get(FIELD_MOBILE_APP, "Stellantis"),
+            # API brand field (upstream 62b40fd), the app for older data
+            "manufacturer": coordinator.vehicle.get("brand") or coordinator.config.get(FIELD_MOBILE_APP, "Stellantis"),
             "model": f"{type_label} - {vin}",
             "serial_number": vin,
         }
@@ -312,9 +315,12 @@ class MqttBridge:
             async with self._command_lock:
                 try:
                     await entity.handle_command(payload)
+                except ServiceValidationError as err:
+                    # e.g. another command is still pending (upstream: toast in HA)
+                    _LOGGER.warning("Command %r for %s/%s rejected: %s", payload, binding.vin, entity.key, err)
                 except Exception as err:  # noqa: BLE001 - upstream raises into HA, we only log
                     _LOGGER.error("Command %r for %s/%s failed: %s", payload, binding.vin, entity.key, err)
-            # Availability (pending action) and command_status changed
+            # command_status / command_pending changed
             self.on_coordinator_update(binding.coordinator)
             return
         _LOGGER.debug("Ignoring message on unknown topic %s", topic)

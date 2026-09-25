@@ -48,6 +48,12 @@ Differences to the integration:
   20 entries as attributes.
 - **Last charge**, charge limit, ABRP token etc. are stored inside the add-on (see Data),
   not via the HA state restore.
+- **Pending command**: while a command still waits for the vehicle's answer (at most 60 s),
+  another one is rejected. HA shows no message for that; the add-on log does, and
+  `binary_sensor.…_command_pending` is on meanwhile.
+- **Maintenance** (`sensor.…_mileage_before_maintenance`, `…_days_before_maintenance`): if
+  the endpoint fails once, the last values stay; vehicles without maintenance data stop
+  being asked.
 
 ## MQTT topics
 

@@ -2,7 +2,7 @@
 
 Replaces the upstream platform files (sensor.py, binary_sensor.py, button.py,
 number.py, switch.py, text.py, time.py, device_tracker.py) and the entity
-half of the upstream base.py (commit 69fddda). Every class here knows
+half of the upstream base.py (commit da32364, first ported from 69fddda). Every class here knows
 
   - how to describe itself for MQTT discovery (``component``, ``discovery``),
   - how to derive its state / attributes / availability from the coordinator
@@ -171,11 +171,13 @@ class Entity:
 
     @property
     def available_command(self) -> bool:
-        """Base availability for remote commands (upstream)."""
+        """Base availability for remote commands (upstream). A pending command
+        no longer makes buttons unavailable: the coordinator rejects a second
+        command and ``binary_sensor.command_pending`` shows the state."""
         stellantis = self.stellantis
         mqtt_is_connected = bool(stellantis and stellantis._mqtt and stellantis._mqtt.is_connected())
         command_is_enabled = self.name not in self.coordinator.disabled_commands
-        return mqtt_is_connected and command_is_enabled and not self.coordinator.pending_action
+        return mqtt_is_connected and command_is_enabled
 
     def update(self) -> None:
         """Recompute state/attributes from the coordinator."""
@@ -238,7 +240,10 @@ class Entity:
 
         if key == "battery":
             value = int(value)
-            autonomy = sensors.get("autonomy")
+            # Autonomy from the current payload, not the retained sensor value:
+            # that keeps an old 0 while the field is missing (sleeping car) and
+            # would zero a fresh battery level (upstream 50c28de).
+            autonomy = get_value_from_map(self.data, ["energies", {"type": "Electric"}, "autonomy"])
             if value > 90 and autonomy is not None and autonomy == 0:
                 # https://github.com/andreadegiovine/homeassistant-stellantis-vehicles/pull/476
                 value = 0
@@ -497,6 +502,13 @@ class RemoteCommandsBinarySensor(Entity):
         self.native_value = bool(stellantis and stellantis._mqtt and stellantis._mqtt.is_connected())
 
 
+class CommandPendingBinarySensor(Entity):
+    component = "binary_sensor"
+
+    def update(self) -> None:
+        self.native_value = self.coordinator.pending_action
+
+
 # --- device tracker -----------------------------------------------------------
 class DeviceTracker(Entity):
     component = "device_tracker"
@@ -623,6 +635,17 @@ class PreconditioningButton(Button):
         await self.coordinator.send_preconditioning_command(self.name, self._action)
 
 
+class ChargingLimitButton(Button):
+    """Native 80 % charge limit of the vehicle (``daily`` on / ``trip`` off)."""
+
+    async def press(self) -> None:
+        await self.coordinator.send_charge_limit_command(self.name, self._action)
+
+
+def native_charge_limit_active(sensors: dict) -> bool:
+    return sensors.get("battery_charging_limit") == "Partial"
+
+
 # --- stored-config backed entities (number / switch / text) ------------------
 class StoredEntity(Entity):
     """Value lives in the per-vehicle stored config; mirrored into _sensors."""
@@ -703,10 +726,16 @@ class Switch(StoredEntity):
         await self.set_value(payload == PAYLOAD_ON)
 
 
+class BatteryChargingLimitNumber(Number):
+    @property
+    def available(self) -> bool:
+        return not native_charge_limit_active(self.sensors)
+
+
 class BatteryChargingLimitSwitch(Switch):
     @property
     def available(self) -> bool:
-        return bool(self.sensors.get("number_battery_charging_limit", False))
+        return bool(self.sensors.get("number_battery_charging_limit", False)) and not native_charge_limit_active(self.sensors)
 
 
 class AbrpSyncSwitch(Switch):
@@ -803,6 +832,8 @@ def build_entities(coordinator, remote_commands: bool) -> list[Entity]:
         entities.append(RemoteCommandsBinarySensor(coordinator, "remote_commands", icon="mdi:broadcast",
                                                    device_class=BinarySensorDeviceClass.CONNECTIVITY,
                                                    entity_category=EntityCategory.DIAGNOSTIC))
+        entities.append(CommandPendingBinarySensor(coordinator, "command_pending", icon="mdi:progress-clock",
+                                                   entity_category=EntityCategory.DIAGNOSTIC))
 
     # device_tracker.py
     entities.append(DeviceTracker(coordinator, "vehicle", icon=SENSORS_DEFAULT["vehicle"]["icon"], source_type="gps"))
@@ -819,10 +850,12 @@ def build_entities(coordinator, remote_commands: bool) -> list[Entity]:
         if is_ev:
             entities.append(ChargingStartStopButton(coordinator, "charge_start", icon="mdi:battery-charging", action="immediate"))
             entities.append(ChargingStartStopButton(coordinator, "charge_stop", icon="mdi:battery-off", action="delayed"))
+            entities.append(ChargingLimitButton(coordinator, "charge_limit_on", icon="mdi:battery-lock", action="daily"))
+            entities.append(ChargingLimitButton(coordinator, "charge_limit_off", icon="mdi:battery-lock-open", action="trip"))
 
     # number.py
     if is_ev and remote_commands:
-        entities.append(Number(coordinator, "battery_charging_limit", icon="mdi:battery-charging-60",
+        entities.append(BatteryChargingLimitNumber(coordinator, "battery_charging_limit", icon="mdi:battery-charging-60",
                                unit_of_measurement=PERCENTAGE, min=15, max=95, step=1, mode="slider",
                                entity_category=EntityCategory.CONFIG))
     entities.append(Number(coordinator, "refresh_interval", icon="mdi:sync", default_value=float(UPDATE_INTERVAL),

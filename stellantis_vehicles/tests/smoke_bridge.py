@@ -152,7 +152,7 @@ async def main():
     stellantis = FakeStellantis(hass)
     stellantis.set_entry(hass.config_entries.entry)
     stellantis.save_config({"mobile_app": "MyPeugeot", "country_code": "DE"})
-    vehicle = {"vin": VIN, "vehicle_id": "veh1", "type": "Electric",
+    vehicle = {"vin": VIN, "vehicle_id": "veh1", "type": "Electric", "brand": "Peugeot",
                "picture": "https://visuel3d-secure.peugeot.com/V3DImage.ashx?view=001"}
     stellantis._vehicles = [vehicle]
 
@@ -173,7 +173,7 @@ async def main():
           f"components: {sorted(components)}")
     battery_cfg = configs[f"homeassistant/sensor/stellantis_{VIN}/battery/config"]
     check(battery_cfg["name"] == "Batterie", f"translated name: {battery_cfg['name']}")
-    check(battery_cfg["device"]["manufacturer"] == "MyPeugeot", "device manufacturer from config")
+    check(battery_cfg["device"]["manufacturer"] == "Peugeot", "device manufacturer from the API brand")
     check(battery_cfg["unit_of_measurement"] == "%" and battery_cfg["device_class"] == "battery", "sensor discovery fields")
     tracker_cfg = configs[f"homeassistant/device_tracker/stellantis_{VIN}/vehicle/config"]
     check(tracker_cfg.get("entity_picture", "").startswith("https://visuel3d"), "tracker entity_picture from vehicle picture URL")
@@ -211,6 +211,11 @@ async def main():
     check(av("preconditioning_start") == "online", "preconditioning available (locked, charging)")
     check(av("switch/battery_charging_limit") == "offline", "charge-limit switch unavailable without limit")
     check(s("mileage_before_maintenance") == "15000" and s("days_before_maintenance") == "200", "maintenance sensors")
+    check(s("battery_charging_limit") == "None" and s("command_pending") == "OFF", "native charge limit unknown without charging.type, command_pending OFF")
+    check(configs[f"homeassistant/button/stellantis_{VIN}/charge_limit_on/config"]["name"] == "Charge limit 80% on"
+          and f"homeassistant/button/stellantis_{VIN}/charge_limit_off/config" in configs, "native charge limit buttons (en fallback)")
+    check(configs[f"homeassistant/binary_sensor/stellantis_{VIN}/command_pending/config"]["name"] == "Befehl ausstehend",
+          "command_pending discovery translated")
 
     print("commands")
     await bridge._dispatch_command(f"stellantis/{VIN}/number/battery_charging_limit/set", "150")
@@ -226,12 +231,13 @@ async def main():
     await bridge._dispatch_command(f"stellantis/{VIN}/button/doors_lock/set", "PRESS")
     check(stellantis.sent[-1] == ("/Doors", {"action": "lock"}), f"doors lock sent: {stellantis.sent[-1]}")
     check(s("command_status") == "Türen verriegeln: " or s("command_status").startswith("Türen verriegeln") or s("command_status") in ("None", None), f"command_status {s('command_status')!r}")
-    check(av("horn") == "offline", "buttons unavailable while action pending")
+    check(s("command_pending") == "ON" and av("horn") == "online", "command_pending ON, buttons stay available")
     entry = coordinator._commands_history["action1"]
     check(entry["service"] == "/Doors" and entry["message"] == {"action": "lock"} and entry["retried"] is False
           and entry["sent_at"] is not None, "history entry keeps service/message for the MQTT 400 retry")
     n_sent = len(stellantis.sent)
-    coordinator._pending_action_id = "action1"  # the horn button is unavailable, send directly
+    await bridge._dispatch_command(f"stellantis/{VIN}/button/horn/set", "PRESS")
+    check(len(stellantis.sent) == n_sent, "press while pending is rejected by the bridge without crashing")
     try:
         await coordinator.send_horn_command("Hupe")
         rejected = None
@@ -244,7 +250,7 @@ async def main():
     await coordinator.update_command_history("action1", "0")
     check(not coordinator.pending_action, "final status clears pending")
     check(s("command_status").endswith("Abgeschlossen") or "0" in s("command_status") or s("command_status"), f"command_status after result: {s('command_status')!r}")
-    check(av("horn") == "online", "buttons available again")
+    check(s("command_pending") == "OFF", "command_pending OFF again")
     await bridge._dispatch_command(f"stellantis/{VIN}/text/battery_charging_start/set", "06:15")
     check(stellantis.sent[-1][0] == "/VehCharge" and stellantis.sent[-1][1]["program"] == {"hour": 6, "minute": 15}, f"charge time sent: {stellantis.sent[-1]}")
     # No answer from the vehicle: the pending command stops blocking after the timeout
@@ -256,6 +262,9 @@ async def main():
     await bridge._dispatch_command(f"stellantis/{VIN}/button/wakeup/set", "PRESS")
     check(stellantis.sent[-1] == ("/VehCharge/state", {"action": "state"}), "wakeup sent")
     await coordinator.update_command_history("action4", "0")
+    await bridge._dispatch_command(f"stellantis/{VIN}/button/charge_limit_on/set", "PRESS")
+    check(stellantis.sent[-1] == ("/VehCharge/limit", {"action": "daily"}), f"charge limit on sent: {stellantis.sent[-1]}")
+    await coordinator.update_command_history("action5", "0")
     for i in range(COMMAND_HISTORY_LIMIT + 5):
         coordinator._commands_history[f"old{i}"] = {"name": "x", "updates": [], "sent_at": get_datetime()}
     coordinator._prune_command_history()
@@ -305,6 +314,33 @@ async def main():
     lc = a("last_charge")
     check(lc.get("in_progress") is True and lc.get("initial_percentage") == "67 %" and s("last_charge") != "None",
           f"stale in_progress dropped, new charge start detected: {lc}")
+
+    print("native charge limit active")
+    partial = copy.deepcopy(stellantis.status)
+    partial["updatedAt"] = "2026-09-05T14:30:00Z"
+    partial["energies"][0]["level"] = 85
+    partial["energies"][0]["extension"]["electric"]["charging"]["type"] = "Partial"
+    stellantis.status = partial
+    await coordinator.async_refresh()
+    check(s("battery_charging_limit") == "ON", "binary sensor battery_charging_limit ON")
+    check(av("number/battery_charging_limit") == "offline" and av("switch/battery_charging_limit") == "offline",
+          "own charge limit number/switch unavailable")
+    n_sent = len(stellantis.sent)
+    await coordinator.async_refresh()  # 85 % >= 80 % limit, switch on - but the vehicle limits itself
+    stellantis.status["updatedAt"] = "2026-09-05T14:40:00Z"
+    await coordinator.async_refresh()
+    check(len(stellantis.sent) == n_sent, "no own charge-stop command while the native limit is active")
+    stellantis.status["energies"][0]["extension"]["electric"]["charging"]["type"] = "Full"
+    stellantis.status["updatedAt"] = "2026-09-05T14:45:00Z"
+    await coordinator.async_refresh()
+    check(s("battery_charging_limit") == "OFF" and av("number/battery_charging_limit") == "online", "native limit off again")
+
+    print("battery guard uses the current payload")
+    coordinator._sensors["autonomy"] = 0  # stale retained value from a sleeping car
+    stellantis.status["updatedAt"] = "2026-09-05T14:50:00Z"
+    stellantis.status["energies"][0]["level"] = 95
+    await coordinator.async_refresh()
+    check(s("battery") == "95", f"battery not zeroed by a stale autonomy: {s('battery')}")
 
     print("maintenance endpoint")
     stellantis.maintenance_error = RuntimeError("maintenance down")
