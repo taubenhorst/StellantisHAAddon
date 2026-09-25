@@ -107,6 +107,12 @@
       "autonomy": {
         "name": "Autonomie batterie"
       },
+      "mileage_before_maintenance": {
+        "name": "Kilométrage avant entretien"
+      },
+      "days_before_maintenance": {
+        "name": "Jours avant entretien"
+      },
       "battery": {
         "name": "Niveau batterie"
       },
@@ -290,6 +296,9 @@
       "battery_charging": {
         "name": "Batterie en charge"
       },
+      "battery_charging_limit": {
+        "name": "Limite de recharge batterie 80%"
+      },
       "engine": {
         "name": "Moteur"
       },
@@ -304,6 +313,9 @@
       },
       "remote_commands": {
         "name": "Commandes à distance"
+      },
+      "command_pending": {
+        "name": "Commande en attente"
       },
       "daylight": {
         "name": "Lumière du jour"
@@ -330,6 +342,12 @@
       },
       "charge_stop": {
         "name": "Arrêter recharge"
+      },
+      "charge_limit_on": {
+        "name": "Activer limite de recharge 80%"
+      },
+      "charge_limit_off": {
+        "name": "Désactiver limite de recharge 80%"
       },
       "preconditioning_start": {
         "name": "Démarrer pré-conditionnement"
@@ -388,6 +406,11 @@
       "battery_charging_start": {
         "name": "Début recharge batterie"
       }
+    }
+  },
+  "exceptions": {
+    "command_already_pending": {
+      "message": "Impossible d'envoyer « {name} » : « {pending_name} » attend toujours une réponse du véhicule."
     }
   },
   "common": {

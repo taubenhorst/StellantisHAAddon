@@ -88,9 +88,9 @@ Container zusammenfasst. Fahrzeuge kommen per MQTT Discovery nach HA.
   `https://github.com/users/taubenhorst/packages/container/<paket>/settings` → Change visibility.
 
 ## Mehrsprachigkeit
-- Alle 14 Upstream-Übersetzungen sind vendored; der Shim-Loader (`hass_shim/.../translation.py`) legt
+- Alle 15 Upstream-Übersetzungen sind vendored (seit da32364 inkl. `sl`); der Shim-Loader (`hass_shim/.../translation.py`) legt
   die gewählte Sprache über die englische Basis (fehlende Schlüssel → Englisch, nicht → Schlüsselname),
-  kennt Aliase (`cs`→`cz`, `nb-NO`, `pt-BR`) und Regionalcodes (`fr-FR`→`fr`). `config.yaml` bietet alle 14 an.
+  kennt Aliase (`cs`→`cz`, `nb-NO`, `pt-BR`) und Regionalcodes (`fr-FR`→`fr`). `config.yaml` bietet alle 15 an.
 - Der Chromium-Login nutzt das Locale der App-Konfiguration (`stellantis.get_config("locale")`, z. B. `de-DE`).
 - Eigene UI-Texte (`web/server.py`, `web/setup.py`) sind weiterhin nur de/en; andere Sprachen sehen Englisch.
 - Test: `tests/smoke_i18n.py`.

@@ -6,6 +6,7 @@ errors; no vehicles.
     .venv/Scripts/python tests/smoke_runtime.py
 """
 import asyncio
+import json
 import os
 import sys
 import tempfile
@@ -131,6 +132,15 @@ async def main():
     check(c1.running and "auth" not in state, "polling again, auth state cleared")
     check(stellantis.get_config("oauth")["access_token"] == "at2", "runtime config carries the new token")
     check(recorder.published[f"stellantis/{sb.VIN}/available"] == "online", "vehicle online again")
+    with open(os.path.join(data_dir, "config_entry.json"), encoding="utf-8") as f:
+        check(json.load(f)["oauth"]["access_token"] == "at2", "async_update_entry persists the new token")
+
+    print("reauth requested by the upstream token timers")
+    hass.config_entries.entry.async_start_reauth(hass)
+    hass.config_entries.entry.async_start_reauth(hass)
+    check(flow.step == STEP_LOGIN and "reauthentication requested" in state.get("auth", ""),
+          "entry.async_start_reauth -> login required")
+    check(sum(1 for n in hass.notifications if n.get("id") == "reauth") == 1, "same notification id replaces, no duplicate")
     await runtime.stop()
 
     print("retry on API error")

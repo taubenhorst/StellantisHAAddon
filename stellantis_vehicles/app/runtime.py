@@ -29,6 +29,9 @@ class Runtime:
         self._coordinators: dict = {}
         self._lock = asyncio.Lock()
         self._retry: asyncio.TimerHandle | None = None
+        # Upstream starts HA's reauth flow from the token refresh timers
+        # (entry.async_start_reauth); here that means "login required".
+        hass.config_entries.entry.on_reauth = lambda: self._auth_failed("reauthentication requested")
 
     @property
     def coordinators(self) -> dict:

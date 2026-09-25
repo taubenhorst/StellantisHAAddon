@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(APP_DIR, "hass_shim"))
 sys.path.insert(0, APP_DIR)
 
 from homeassistant.core import HomeAssistant  # noqa: E402  (shim)
+from homeassistant.helpers.aiohttp_client import async_close_clientsession  # noqa: E402  (shim)
 
 from stellantis_vehicles.stellantis import StellantisVehicles  # noqa: E402
 from bridge.mqtt_bridge import MqttBridge  # noqa: E402
@@ -115,6 +116,7 @@ async def run() -> None:
     if bridge:
         bridge.disconnect()
     await stellantis.async_shutdown()
+    await async_close_clientsession(hass)
     await web_runner.cleanup()
 
 

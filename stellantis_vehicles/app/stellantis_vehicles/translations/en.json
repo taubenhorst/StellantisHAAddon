@@ -68,7 +68,8 @@
       "get_mqtt_access_token_nok_access": "Invalid SMS code or Pin code",
       "get_mqtt_access_token_nok_maxnbtools": "Limit of associated devices / SMS received, reset your Stellantis account and try again",
       "get_mqtt_access_token_nok_nok_blocked": "Limit of wrong PIN used, restart the configuration process",
-      "get_mqtt_access_token_rate_limit": "Rate limit of mqtt access token request exceeded (6 per day)"
+      "get_mqtt_access_token_rate_limit": "Rate limit of mqtt access token request exceeded (6 per day)",
+      "not_loaded": "Integration is not loaded yet, wait for setup to finish and try again"
     },
     "abort": {
       "already_configured": "Account is already configured",
@@ -105,7 +106,13 @@
         "name": "Speed"
       },
       "autonomy": {
-        "name": "Autonomy"
+        "name": "Range"
+      },
+      "mileage_before_maintenance": {
+        "name": "Mileage before maintenance"
+      },
+      "days_before_maintenance": {
+        "name": "Days before maintenance"
       },
       "battery": {
         "name": "Battery"
@@ -156,7 +163,7 @@
         "name": "Fuel"
       },
       "fuel_autonomy": {
-        "name": "Fuel autonomy"
+        "name": "Fuel range"
       },
       "fuel_consumption_total": {
         "name": "Fuel consumption total"
@@ -224,7 +231,7 @@
             "name": "Initial energy"
           },
           "initial_autonomy": {
-            "name": "Initial autonomy"
+            "name": "Initial range"
           },
           "final_time": {
             "name": "Final time"
@@ -236,7 +243,7 @@
             "name": "Final energy"
           },
           "final_autonomy": {
-            "name": "Final autonomy"
+            "name": "Final range"
           },
           "duration": {
             "name": "Duration"
@@ -248,7 +255,7 @@
             "name": "Recharged energy"
           },
           "recharged_autonomy": {
-            "name": "Recharged autonomy"
+            "name": "Recharged range"
           },
           "avg_power": {
             "name": "Average power"
@@ -290,6 +297,9 @@
       "battery_charging": {
         "name": "Battery charging"
       },
+      "battery_charging_limit": {
+        "name": "Battery charging limit 80%"
+      },
       "engine": {
         "name": "Engine"
       },
@@ -304,6 +314,9 @@
       },
       "remote_commands": {
         "name": "Remote commands"
+      },
+      "command_pending": {
+        "name": "Command pending"
       },
       "daylight": {
         "name": "Daylight"
@@ -330,6 +343,12 @@
       },
       "charge_stop": {
         "name": "Charge stop"
+      },
+      "charge_limit_on": {
+        "name": "Charge limit 80% on"
+      },
+      "charge_limit_off": {
+        "name": "Charge limit 80% off"
       },
       "preconditioning_start": {
         "name": "Preconditioning start"
@@ -390,6 +409,11 @@
       }
     }
   },
+  "exceptions": {
+    "command_already_pending": {
+      "message": "Cannot send \"{name}\": \"{pending_name}\" is still waiting for a response from the vehicle."
+    }
+  },
   "common": {
     "access_token_error_title": "Access token error",
     "access_token_error_message": "Check out the official documentation in the [OAuth2 Code]({oauth_token_doc_link}) section",
@@ -398,7 +422,11 @@
     "no_vehicles_found_title": "Unavailable",
     "no_vehicles_found_message": "No connected vehicles available on this account",
     "command_error_title": "Command",
-    "command_error_message": "The command was not sent correctly"
+    "command_error_message": "The command was not sent correctly",
+    "get_oauth_code_title": "OAuth code error",
+    "get_oauth_code_message": "Could not retrieve the OAuth code for this account. Check your email and password, or try again later if the remote login service is unavailable",
+    "reconfigure_otp_title": "Remote commands disabled",
+    "reconfigure_otp_message": "Authentication for remote commands failed, so they have been disabled. Reconfigure the integration to enable them again"
   },
   "issues": {
     "vehicle_removed": {

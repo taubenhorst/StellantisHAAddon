@@ -43,6 +43,7 @@ class UnitOfTime(StrEnum):
     SECONDS = "s"
     MINUTES = "min"
     HOURS = "h"
+    DAYS = "d"
 
 
 class EntityCategory(StrEnum):

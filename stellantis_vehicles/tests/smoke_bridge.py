@@ -83,7 +83,7 @@ class FakeStellantis(StellantisVehicles):
     async def get_user_vehicles(self, force=False):
         return self._vehicles
 
-    async def send_mqtt_message(self, service, message, vehicle, store=True, action_id=None):
+    async def send_mqtt_message(self, service, message, vehicle, force_token_refresh=False, action_id=None):
         self.sent.append((service, message))
         return f"action{len(self.sent)}"
 

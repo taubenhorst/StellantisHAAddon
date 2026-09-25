@@ -4,6 +4,7 @@ from enum import StrEnum
 class SensorDeviceClass(StrEnum):
     BATTERY = "battery"
     DISTANCE = "distance"
+    DURATION = "duration"
     ENERGY_STORAGE = "energy_storage"
     SPEED = "speed"
     TEMPERATURE = "temperature"

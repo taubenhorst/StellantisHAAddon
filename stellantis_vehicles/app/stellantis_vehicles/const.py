@@ -1,7 +1,7 @@
 import os
 import json
 
-from homeassistant.const import ( UnitOfTemperature, UnitOfLength, PERCENTAGE, UnitOfEnergy, UnitOfSpeed, UnitOfVolume, EntityCategory )
+from homeassistant.const import ( UnitOfTemperature, UnitOfLength, UnitOfTime, PERCENTAGE, UnitOfEnergy, UnitOfSpeed, UnitOfVolume, EntityCategory )
 from homeassistant.components.sensor.const import ( SensorDeviceClass, SensorStateClass )
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
@@ -129,6 +129,35 @@ UPDATE_INTERVAL = 60 # seconds
 # Consecutive empty vehicle-status responses before the account vehicle list is
 # re-fetched to check whether the vehicle was unpaired.
 EMPTY_STATUS_LIMIT = 3
+
+# Maximum number of entries kept in a coordinator's command history. Without a
+# cap, every sent command would stay in memory (and be re-sorted on every
+# coordinator update) for as long as the coordinator lives.
+COMMAND_HISTORY_LIMIT = 50
+
+# process_code values that report a step of a command's lifecycle without
+# resolving it ("accepted", "vehicle asleep", "forwarded to vehicle"): a
+# command sent to the vehicle keeps blocking further remote commands (see
+# pending_action) through these. "901" is currently filtered out before it
+# ever reaches the command history (see the "Skip vehicle as sleep mqtt
+# message" handling in stellantis.py), so listing it here has no effect yet;
+# kept as a safeguard in case that changes.
+COMMAND_STATUS_STILL_IN_PROGRESS = ("900", "901", "903")
+
+# Seconds since a sent command was last updated before it is treated as
+# stale and no longer blocks further commands (see pending_action), even
+# though no final status ever arrived for it (e.g. the MQTT connection
+# dropped before the vehicle's actual response could arrive).
+PENDING_ACTION_TIMEOUT = 60
+
+# Backoff schedule (seconds) for the MQTT token refresh after a transient
+# Stellantis backend failure. Capped at the last step so a prolonged outage is
+# retried every ~15 min instead of once a minute.
+MQTT_TOKEN_RETRY_BACKOFF = (60, 120, 300, 600, 900)
+
+# Same schedule for the OAuth token refresh: retried on a capped backoff after a
+# transient failure instead of a flat 5-minute loop, and logged at WARNING.
+OAUTH_TOKEN_RETRY_BACKOFF = (60, 120, 300, 600, 900)
 
 VEHICLE_TYPE_ELECTRIC = "Electric"
 VEHICLE_TYPE_HYBRID = "Hybrid"
@@ -311,6 +340,22 @@ SENSORS_DEFAULT = {
         "icon": "mdi:steering",
         "value_map" : ["drivingBehavior", "mode"],
         "updated_at_map" : ["drivingBehavior", "createdAt"]
+    },
+    "mileage_before_maintenance" : {
+        "icon" : "mdi:car-wrench",
+        "unit_of_measurement" : UnitOfLength.KILOMETERS,
+        "device_class": SensorDeviceClass.DISTANCE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["maintenance", "mileageBeforeMaintenance"],
+        "updated_at_map" : ["maintenance", "updatedAt"]
+    },
+    "days_before_maintenance" : {
+        "icon" : "mdi:calendar-clock",
+        "unit_of_measurement" : UnitOfTime.DAYS,
+        "device_class": SensorDeviceClass.DURATION,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "value_map" : ["maintenance", "daysBeforeMaintenance"],
+        "updated_at_map" : ["maintenance", "updatedAt"]
     }
 }
 
@@ -392,6 +437,13 @@ BINARY_SENSORS_DEFAULT = {
         "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
         "device_class" : BinarySensorDeviceClass.BATTERY_CHARGING,
         "on_value": "InProgress",
+        "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
+    },
+    "battery_charging_limit" : {
+        "icon" : "mdi:battery-lock",
+        "value_map" : ["energies", {"type":"Electric"}, "extension", "electric", "charging", "type"],
+        "updated_at_map" : ["energy", {"type":"Electric"}, "updatedAt"],
+        "on_value": "Partial",
         "engine": [VEHICLE_TYPE_ELECTRIC, VEHICLE_TYPE_HYBRID]
     },
     "engine" : {

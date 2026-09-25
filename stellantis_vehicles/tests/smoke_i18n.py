@@ -14,7 +14,7 @@ sys.path.insert(0, APP_DIR)
 from homeassistant.helpers import translation  # noqa: E402
 
 DOMAIN = "stellantis_vehicles"
-LANGS = ["cz", "da", "de", "en", "es", "fi", "fr", "it", "nb", "nl", "no", "pl", "pt", "sv"]
+LANGS = ["cz", "da", "de", "en", "es", "fi", "fr", "it", "nb", "nl", "no", "pl", "pt", "sl", "sv"]
 BATTERY = f"component.{DOMAIN}.entity.sensor.battery.name"
 OTP_ERR = f"component.{DOMAIN}.config.error.get_mqtt_access_token_nok_access"
 

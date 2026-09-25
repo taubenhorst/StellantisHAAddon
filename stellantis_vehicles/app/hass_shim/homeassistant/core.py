@@ -31,6 +31,15 @@ class ConfigEntry:
     """Mirrors the fields stellantis.py touches on a HA config entry."""
     data: dict = field(default_factory=dict)
     entry_id: str = "addon"
+    # Called by async_start_reauth; the runtime points it at its own
+    # "login required" handling (HA would start a reauth config flow).
+    on_reauth: Callable[[], None] | None = None
+
+    def async_start_reauth(self, hass: Any = None, **_: Any) -> None:
+        if self.on_reauth is None:
+            _LOGGER.warning("Reauthentication requested, but no handler is registered")
+            return
+        self.on_reauth()
 
 
 class ConfigEntries:
@@ -48,8 +57,12 @@ class ConfigEntries:
             return {}
 
     def async_update_entry(self, entry: ConfigEntry, data: dict | None = None, **_: Any) -> bool:
+        """Like HA: update the entry and persist it (upstream no longer calls
+        the private _async_schedule_save itself since 2026.9.2)."""
         if data is not None:
             entry.data = data
+            if entry is self.entry:
+                self._async_schedule_save()
         return True
 
     def _async_schedule_save(self) -> None:
